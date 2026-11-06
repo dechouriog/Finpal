@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { FinpalLogo } from "@/components/brand/FinpalLogo";
-import { SparkleIcon } from "@/components/brand/SparkleIcon";
+import { PalStageProvider, UserPal } from "@/components/pal/PalStageContext";
+import type { PalStage } from "@/lib/pal";
 import { OPEN_ASSISTANT_EVENT } from "@/components/home/AskAiBanner";
 import { Assistant } from "@/components/assistant/Assistant";
+import { ToastProvider } from "@/components/common/Toast";
 import { APP_OVERLAY_ID } from "@/components/shell/AppPortal";
 import { DISCLAIMER } from "@/lib/brand";
 import { NAV_ITEMS, isActive } from "@/lib/nav";
@@ -21,40 +23,48 @@ const EASE_OUT = [0.22, 1, 0.36, 1] as const;
  *  - narrow (< 48rem): bottom tab bar  -> Mobile
  *  - wide  (>= 48rem): left sidebar    -> Desktop
  */
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({ children, palStage }: { children: ReactNode; palStage: PalStage }) {
   const pathname = usePathname();
+  const mainRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0 });
+  }, [pathname]);
   // The welcome screen is public: no navigation and no assistant until a demo starts.
-  const isPublic = pathname === "/welcome";
+  const isPublic = pathname === "/welcome" || pathname.startsWith("/dev/");
 
   return (
-    <div className="@container/app relative h-full overflow-hidden">
-      {/* Overlays (sheets, panels, assistant) render here via <AppPortal>. */}
-      <div id={APP_OVERLAY_ID} className="pointer-events-none absolute inset-0 z-40 *:pointer-events-auto" />
-      <div className="flex h-full">
-        {!isPublic && <Sidebar pathname={pathname} />}
+    <PalStageProvider stage={palStage}>
+      <ToastProvider>
+        <div className="@container/app relative h-full overflow-hidden">
+          {/* Overlays (sheets, panels, assistant) render here via <AppPortal>. */}
+          <div id={APP_OVERLAY_ID} className="pointer-events-none absolute inset-0 z-40 *:pointer-events-auto" />
+          <div className="flex h-full">
+            {!isPublic && <Sidebar pathname={pathname} />}
 
-        <div className="flex min-w-0 flex-1 flex-col">
-          <main id="main" className="min-h-0 flex-1 overflow-y-auto scrollbar-none">
-            <motion.div
-              key={pathname}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, ease: EASE_OUT }}
-              className="mx-auto w-full max-w-6xl px-5 pb-8 pt-4 @3xl/app:px-10 @3xl/app:pt-8"
-            >
-              {children}
-            </motion.div>
-          </main>
+            <div className="flex min-w-0 flex-1 flex-col">
+              <main id="main" ref={mainRef} className="min-h-0 flex-1 overflow-y-auto scrollbar-none">
+                <motion.div
+                  key={pathname}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, ease: EASE_OUT }}
+                  className="mx-auto w-full max-w-6xl px-5 pb-8 pt-4 @3xl/app:px-10 @3xl/app:pt-8"
+                >
+                  {children}
+                </motion.div>
+              </main>
 
-          <footer className="hidden shrink-0 border-t border-line bg-surface px-10 py-3 text-xs text-muted @3xl/app:block">
-            {DISCLAIMER}
-          </footer>
+              <footer className="hidden shrink-0 border-t border-line bg-surface px-10 py-3 text-xs text-muted @3xl/app:block">
+                {DISCLAIMER}
+              </footer>
 
-          {!isPublic && <TabBar pathname={pathname} />}
+              {!isPublic && <TabBar pathname={pathname} />}
+            </div>
+          </div>
+          {!isPublic && <Assistant />}
         </div>
-      </div>
-      {!isPublic && <Assistant />}
-    </div>
+      </ToastProvider>
+    </PalStageProvider>
   );
 }
 
@@ -98,11 +108,11 @@ function Sidebar({ pathname }: { pathname: string }) {
         <button
           type="button"
           onClick={() => window.dispatchEvent(new CustomEvent(OPEN_ASSISTANT_EVENT))}
-          className="w-full rounded-2xl bg-teal-soft p-4 text-left transition-colors hover:bg-[#d8f6f1]"
+          className="w-full rounded-2xl bg-teal-soft p-4 text-left transition-colors hover:bg-teal-tint"
         >
           <span className="flex items-center gap-2 font-display text-sm font-bold text-deep">
-            <SparkleIcon className="text-teal" size={18} />
-            Ask Finpal AI
+            <UserPal size={26} decorative />
+            Ask Pal
           </span>
           <span className="mt-1 block text-xs text-muted">Ready to make your savings work?</span>
         </button>
@@ -134,11 +144,7 @@ function TabBar({ pathname }: { pathname: string }) {
                     transition={{ duration: 0.3, ease: EASE_OUT }}
                   />
                 )}
-                <Icon
-                  className={cn("size-[22px]", active && "text-teal")}
-                  strokeWidth={active ? 2.4 : 2}
-                  aria-hidden
-                />
+                <Icon className={cn("size-[22px]", active && "text-teal")} strokeWidth={active ? 2.4 : 2} aria-hidden />
                 {label}
               </Link>
             </li>

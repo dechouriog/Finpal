@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, CalendarClock, Loader2 } from "lucide-react";
 import { confirmStarterPortfolio } from "@/app/actions/invest";
-import { SuccessCheck } from "@/components/common/SuccessCheck";
+import { Pal } from "@/components/pal/Pal";
+import { usePalStage } from "@/components/pal/PalStageContext";
+import type { PalStage } from "@/lib/pal";
 import { Donut } from "@/components/invest/Donut";
 import { PayPalCheckout } from "@/components/paypal/PayPalCheckout";
 import { Button } from "@/components/ui/button";
@@ -24,9 +26,16 @@ type Phase = "review" | "paypal" | "working" | "done";
 export function ReviewScreen({ card, onClose }: { card: ReviewCard; onClose: () => void }) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("review");
+  const bodyRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (phase === "done") bodyRef.current?.scrollTo({ top: 0 });
+  }, [phase]);
   const [workingLabel, setWorkingLabel] = useState("Placing your investment…");
   const [error, setError] = useState<string | null>(null);
   const [nextRuns, setNextRuns] = useState<string[]>(card.autoInvest?.nextRuns ?? []);
+  const currentStage = usePalStage();
+  // Stage after this investment; Pal grows right on the success screen.
+  const [grown, setGrown] = useState<PalStage | null>(null);
   // Default funding is PayPal. If the balance is short, PayPal covers the difference.
   const [fundWith, setFundWith] = useState<"paypal" | "balance">("paypal");
   const short = card.shortfallCents > 0;
@@ -48,6 +57,7 @@ export function ReviewScreen({ card, onClose }: { card: ReviewCard; onClose: () 
       return;
     }
     if (res.nextRuns.length) setNextRuns(res.nextRuns);
+    setGrown(res.stage);
     setPhase("done");
     router.refresh();
   };
@@ -83,14 +93,15 @@ export function ReviewScreen({ card, onClose }: { card: ReviewCard; onClose: () 
         <p className="font-display text-base font-extrabold text-ink">{phase === "done" ? "All set" : "Review & confirm"}</p>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+      <div ref={bodyRef} className="min-h-0 flex-1 overflow-y-auto p-4">
         {phase === "done" ? (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center pt-4 text-center" role="status">
-            <SuccessCheck />
-            <h2 className="mt-4 font-display text-2xl font-extrabold text-ink">You&apos;re invested!</h2>
+            <Pal mood="proud" size={160} stage={grown ?? currentStage} />
+            <h2 className="mt-2 font-display text-2xl font-extrabold text-ink">You&apos;re invested!</h2>
             <p className="mt-1 text-sm text-muted">
               {formatCents(card.amountCents)} is now in your {card.levelLabel.toLowerCase()} starter portfolio.
             </p>
+            <p className="mt-2 text-sm font-semibold text-teal-ink">You&apos;re officially an investor. Slow money, strong money.</p>
             {card.autoInvest && (
               <div className="mt-5 w-full rounded-2xl bg-surface p-4 text-left ring-1 ring-line">
                 <p className="flex items-center gap-2 font-display text-sm font-bold text-ink">
@@ -178,7 +189,7 @@ export function ReviewScreen({ card, onClose }: { card: ReviewCard; onClose: () 
             </dl>
 
             <p className="text-xs text-muted">
-              Investing involves risk, including loss of money. Finpal AI offers education, not financial advice.
+              Investing involves risk, including loss of money. Pal offers education, not financial advice.
             </p>
 
             {error && (

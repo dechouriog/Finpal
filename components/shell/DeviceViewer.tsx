@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { motion } from "framer-motion";
+import { MotionConfig, motion } from "framer-motion";
 import { BatteryFull, Monitor, SignalHigh, Smartphone, Wifi } from "lucide-react";
 import { FinpalLogo } from "@/components/brand/FinpalLogo";
 import { AppShell } from "@/components/shell/AppShell";
+import { arrowKeyNav } from "@/lib/a11y";
+import type { PalStage } from "@/lib/pal";
 import { cn } from "@/lib/utils";
 
 type DeviceMode = "desktop" | "mobile";
@@ -34,7 +36,7 @@ function writeMode(mode: DeviceMode) {
  * works. The app inside decides its layout with container queries, and the
  * tree below <AppShell> is identical in both modes, so it keeps its state.
  */
-export function DeviceViewer({ children }: { children: ReactNode }) {
+export function DeviceViewer({ children, palStage }: { children: ReactNode; palStage: PalStage }) {
   const [mode, setMode] = useState<DeviceMode>("desktop");
   const [ready, setReady] = useState(false);
 
@@ -56,63 +58,58 @@ export function DeviceViewer({ children }: { children: ReactNode }) {
   const isMobile = mode === "mobile";
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden">
-      {/* Viewer bar (not part of the app) */}
-      <header className="z-20 flex h-14 shrink-0 items-center justify-between gap-4 border-b border-line bg-surface px-4 sm:px-6">
-        <div className="flex items-center gap-3">
-          <FinpalLogo size={28} />
-          <span className="hidden rounded-full bg-navy-soft px-2.5 py-1 text-xs font-medium text-navy sm:inline">
-            Hackathon demo
-          </span>
-        </div>
-        <DeviceToggle mode={mode} onChange={change} />
-      </header>
+    // reducedMotion="user": animations follow the OS "reduce motion" setting.
+    <MotionConfig reducedMotion="user">
+      <div className="flex h-dvh flex-col overflow-hidden">
+        {/* Viewer bar (not part of the app) */}
+        <header className="z-20 flex h-14 shrink-0 items-center justify-between gap-4 border-b border-line bg-surface px-4 sm:px-6">
+          <div className="flex items-center gap-3">
+            <FinpalLogo size={28} />
+            <span className="rounded-full bg-amber-soft px-2.5 py-1 text-xs font-semibold text-amber-ink">
+              Sandbox<span className="hidden sm:inline"> · test money only</span>
+            </span>
+          </div>
+          <DeviceToggle mode={mode} onChange={change} />
+        </header>
 
-      {/* Stage */}
-      <div
-        className={cn(
-          "relative min-h-0 flex-1 transition-opacity duration-300",
-          ready ? "opacity-100" : "opacity-0",
-          isMobile && "flex items-center justify-center overflow-hidden p-6",
-        )}
-      >
-        {isMobile && (
-          <div
-            aria-hidden
-            className="pointer-events-none absolute left-1/2 top-1/2 size-[640px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-teal-soft"
-          />
-        )}
-
-        {/* Phone bezel (generic, no real-device likeness) */}
+        {/* Stage */}
         <div
           className={cn(
-            "relative",
-            isMobile
-              ? "rounded-[56px] bg-ink p-3 shadow-[0_30px_80px_-20px_rgba(6,26,63,0.45)]"
-              : "h-full w-full",
+            "relative min-h-0 flex-1 transition-opacity duration-300",
+            ready ? "opacity-100" : "opacity-0",
+            isMobile && "flex items-center justify-center overflow-hidden p-6",
           )}
-          style={isMobile ? { height: "min(900px, 100%)", aspectRatio: "420 / 900" } : undefined}
         >
-          {/* Screen */}
+          {isMobile && (
+            <div
+              aria-hidden
+              className="pointer-events-none absolute left-1/2 top-1/2 size-[640px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-teal-soft"
+            />
+          )}
+
+          {/* Phone bezel (generic, no real-device likeness) */}
           <div
-            className={cn(
-              "relative flex h-full w-full flex-col overflow-hidden bg-bg",
-              isMobile && "rounded-[44px]",
-            )}
+            className={cn("relative", isMobile ? "rounded-[56px] bg-ink p-3 shadow-device" : "h-full w-full")}
+            style={isMobile ? { height: "min(900px, 100%)", aspectRatio: "420 / 900" } : undefined}
           >
-            {isMobile && <StatusBar />}
-            <div className="min-h-0 flex-1">
-              <AppShell>{children}</AppShell>
-            </div>
-            {isMobile && (
-              <div aria-hidden className="flex h-5 shrink-0 items-start justify-center bg-surface">
-                <span className="h-1 w-28 rounded-full bg-ink/80" />
+            {/* Screen */}
+            <div
+              className={cn("relative flex h-full w-full flex-col overflow-hidden bg-bg", isMobile && "rounded-[44px]")}
+            >
+              {isMobile && <StatusBar />}
+              <div className="min-h-0 flex-1">
+                <AppShell palStage={palStage}>{children}</AppShell>
               </div>
-            )}
+              {isMobile && (
+                <div aria-hidden className="flex h-5 shrink-0 items-start justify-center bg-surface">
+                  <span className="h-1 w-28 rounded-full bg-ink/80" />
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </MotionConfig>
   );
 }
 
@@ -140,7 +137,11 @@ function DeviceToggle({ mode, onChange }: { mode: DeviceMode; onChange: (m: Devi
     { value: "mobile", label: "Mobile", icon: Smartphone },
   ];
   return (
-    <div role="radiogroup" aria-label="Device preview" className="flex rounded-full bg-bg p-1 ring-1 ring-line">
+    <div
+      role="radiogroup"
+      aria-label="Device preview"
+      onKeyDown={arrowKeyNav(["desktop", "mobile"] as const, mode, onChange)}
+      className="flex rounded-full bg-bg p-1 ring-1 ring-line">
       {options.map(({ value, label, icon: Icon }) => {
         const active = mode === value;
         return (
@@ -149,6 +150,7 @@ function DeviceToggle({ mode, onChange }: { mode: DeviceMode; onChange: (m: Devi
             type="button"
             role="radio"
             aria-checked={active}
+            tabIndex={active ? 0 : -1}
             onClick={() => onChange(value)}
             className={cn(
               "relative flex h-8 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium transition-colors",

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -8,6 +9,12 @@ import { positionValueCents } from "@/lib/portfolio";
 import { getCurrentUser } from "@/lib/session";
 import { formatCents } from "@/lib/utils";
 import { AssetId } from "@/lib/validation";
+
+export async function generateMetadata({ params }: { params: Promise<{ assetId: string }> }): Promise<Metadata> {
+  const parsed = AssetId.safeParse((await params).assetId);
+  const asset = parsed.success ? await prisma.asset.findUnique({ where: { id: parsed.data }, select: { name: true } }) : null;
+  return { title: asset?.name ?? "Asset" };
+}
 
 export default async function AssetPage({ params }: { params: Promise<{ assetId: string }> }) {
   const parsed = AssetId.safeParse((await params).assetId);
@@ -27,7 +34,7 @@ export default async function AssetPage({ params }: { params: Promise<{ assetId:
         <ArrowLeft className="size-4" aria-hidden /> Invest
       </Link>
 
-      <div className="grid items-start gap-6 @3xl/app:grid-cols-5">
+      <div className="grid grid-cols-1 items-start gap-6 @3xl/app:grid-cols-5">
         <section className="space-y-5 rounded-3xl bg-surface p-5 ring-1 ring-line @3xl/app:col-span-3 @3xl/app:p-7">
           <div>
             <span className="inline-flex items-center gap-2 rounded-full bg-bg px-3 py-1 text-xs font-semibold text-ink">
@@ -40,14 +47,12 @@ export default async function AssetPage({ params }: { params: Promise<{ assetId:
 
           <div className="grid grid-cols-3 gap-3">
             <Fact label="Price" value={formatCents(asset.priceCents)} />
-            <Fact label="Your shares" value={position && position.shares > 0 ? position.shares.toFixed(4) : "—"} />
-            <Fact label="Your value" value={formatCents(valueCents)} />
+            <Fact label="Shares" value={position && position.shares > 0 ? position.shares.toFixed(4) : "—"} />
+            <Fact label="Value" value={formatCents(valueCents)} />
           </div>
 
           {/* TODO(prices): plug a real market data feed here (quote, daily change, price chart). */}
-          <div className="rounded-2xl border border-dashed border-line p-4 text-sm text-muted">
-            Live prices and charts would appear here. In this demo, prices are fixed and do not move.
-          </div>
+          <p className="text-xs text-muted">Demo price: fixed and illustrative. Not a real security.</p>
         </section>
 
         <div className="@3xl/app:col-span-2">
@@ -68,8 +73,8 @@ export default async function AssetPage({ params }: { params: Promise<{ assetId:
 function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl bg-bg p-3">
-      <p className="text-xs text-muted">{label}</p>
-      <p className="mt-0.5 truncate font-display text-base font-extrabold text-ink tabular">{value}</p>
+      <p className="whitespace-nowrap text-xs text-muted">{label}</p>
+      <p className="mt-0.5 font-display text-sm font-extrabold text-ink tabular @md/app:text-base">{value}</p>
     </div>
   );
 }

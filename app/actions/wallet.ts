@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { errorMessage } from "@/lib/api";
+import { TOO_MANY, allow } from "@/lib/rate-limit";
 import { getCurrentUserId } from "@/lib/session";
 import { WithdrawInput } from "@/lib/validation";
 import { withdraw } from "@/lib/wallet";
@@ -15,6 +16,7 @@ export async function withdrawToPayPal(input: WithdrawInput): Promise<WithdrawRe
 
   try {
     const userId = await getCurrentUserId();
+    if (!allow("payout", userId)) return { ok: false, error: TOO_MANY };
     const res = await withdraw(userId, parsed.data.amountCents, parsed.data.receiverEmail);
     revalidatePath("/", "layout");
     return { ok: true, ...res };

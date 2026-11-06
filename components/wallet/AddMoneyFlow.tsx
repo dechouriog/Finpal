@@ -85,7 +85,7 @@ export function AddMoneyFlow({ balanceCents }: { balanceCents: number }) {
               <div className="mt-3 grid grid-cols-4 gap-2">
                 {PRESETS.map((p) => (
                   <Chip key={p} active={preset === p} onClick={() => setPreset(p)}>
-                    {formatCents(p).replace(".00", "")}
+                    {formatCents(p, { compact: true })}
                   </Chip>
                 ))}
                 <Chip active={preset === "custom"} onClick={() => setPreset("custom")}>

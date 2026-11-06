@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { errorMessage, jsonError } from "@/lib/api";
+import { TOO_MANY, allow } from "@/lib/rate-limit";
 import { getSessionUserId } from "@/lib/session";
 import { DepositInput } from "@/lib/validation";
 import { startDeposit } from "@/lib/wallet";
@@ -11,6 +12,7 @@ export async function POST(req: Request) {
 
   const userId = await getSessionUserId();
   if (!userId) return jsonError("Please start the demo first.", 401);
+  if (!allow("deposit", userId)) return jsonError(TOO_MANY, 429);
   try {
     const orderId = await startDeposit(userId, parsed.data.amountCents);
     return NextResponse.json({ ok: true, orderId });

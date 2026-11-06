@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import { InvestView } from "@/components/invest/InvestView";
 import type { AssetRow, PlanRow } from "@/components/invest/types";
 import { AssetCategory } from "@/lib/domain";
 import { getInvestOverview } from "@/lib/invest";
 import { describeRule, nextRunDates, parseMonthDays } from "@/lib/schedule";
 import { getCurrentUser } from "@/lib/session";
+
+export const metadata: Metadata = { title: "Invest" };
 
 export default async function InvestPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const { tab } = await searchParams;

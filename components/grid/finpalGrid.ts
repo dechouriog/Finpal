@@ -1,6 +1,6 @@
 "use client";
 
-import { AllCommunityModule, ModuleRegistry, themeQuartz } from "ag-grid-community";
+import { AllCommunityModule, ModuleRegistry, themeQuartz, type GridSizeChangedEvent } from "ag-grid-community";
 
 // Register AG Grid Community features once for the whole app.
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -12,7 +12,7 @@ export const finpalGridTheme = themeQuartz.withParams({
   foregroundColor: "#0F172A",
   borderColor: "#E2E8F0",
   headerBackgroundColor: "#F6F8FB",
-  headerTextColor: "#64748B",
+  headerTextColor: "#5C6B80",
   headerFontWeight: 600,
   oddRowBackgroundColor: "#FFFFFF",
   fontFamily: "var(--font-inter), ui-sans-serif, system-ui, sans-serif",
@@ -25,4 +25,15 @@ export const finpalGridTheme = themeQuartz.withParams({
   cellHorizontalPadding: 16,
 });
 
-export const currencyFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+/**
+ * Responsive grid columns: below `minWidth` px the secondary columns are hidden and
+ * the key column is pinned left, so the grid never needs horizontal scrolling.
+ */
+export function responsiveColumns(minWidth: number, secondary: string[], key: string) {
+  return (e: GridSizeChangedEvent) => {
+    const wide = e.clientWidth >= minWidth;
+    e.api.setColumnsVisible(secondary, wide);
+    e.api.setColumnsPinned([key], wide ? null : "left");
+    e.api.sizeColumnsToFit();
+  };
+}

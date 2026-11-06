@@ -14,7 +14,9 @@
     "postinstall": "prisma generate",
     "test:assistant": "tsx --conditions=react-server --env-file=.env scripts/test-assistant.ts",
     "cleanup:demo": "tsx scripts/cleanup-demo.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "export:pal": "tsx --tsconfig scripts/tsconfig.scripts.json scripts/export-pal-svg.ts"
   },
   "dependencies": {
     "@paypal/agent-toolkit": "^1.11.0",
@@ -40,6 +42,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.7",
+    "@playwright/test": "^1.65.0",
     "@tailwindcss/postcss": "^4.3.4",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",

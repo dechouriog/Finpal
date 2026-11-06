@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { CalendarClock, ChevronLeft, ChevronRight, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { deleteAutoInvestPlan, saveAutoInvestPlan } from "@/app/actions/invest";
 import { Sheet } from "@/components/common/Sheet";
+import { useToast } from "@/components/common/Toast";
 import { Button } from "@/components/ui/button";
-import { amountToCents, isAmountInput } from "@/lib/money";
+import { amountToCents, centsToInput, isAmountInput } from "@/lib/money";
 import { ordinal, shortDate } from "@/lib/schedule";
 import { cn, formatCents } from "@/lib/utils";
 import { AutoInvestPlanInput } from "@/lib/validation";
@@ -24,7 +25,7 @@ export function AutoInvestTab({ plans }: { plans: PlanRow[] }) {
   const [editing, setEditing] = useState<PlanRow | "new" | null>(null);
 
   return (
-    <div className="grid items-start gap-6 @3xl/app:grid-cols-5">
+    <div className="grid grid-cols-1 items-start gap-6 @3xl/app:grid-cols-5">
       <div className="@3xl/app:col-span-3">
         <MonthCalendar plans={plans} />
       </div>
@@ -39,7 +40,7 @@ export function AutoInvestTab({ plans }: { plans: PlanRow[] }) {
         </div>
         {plans.length === 0 ? (
           <p className="rounded-xl bg-bg p-4 text-sm text-muted">
-            No recurring investments yet. Ask Finpal AI to set one up, or create a plan.
+            No recurring investments yet. Ask Pal to set one up, or create a plan.
           </p>
         ) : (
           <ul className="space-y-2">
@@ -153,7 +154,7 @@ function MonthCalendar({ plans }: { plans: PlanRow[] }) {
               <span className={cn("font-semibold", c.isToday ? "text-navy" : "text-ink")}>{c.day}</span>
               {c.amountCents > 0 && (
                 <span className="mt-auto w-full truncate rounded-md bg-teal px-0.5 text-[10px] font-bold text-deep tabular">
-                  {formatCents(c.amountCents).replace(".00", "")}
+                  {formatCents(c.amountCents, { compact: true })}
                 </span>
               )}
             </div>
@@ -170,11 +171,12 @@ const DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => i + 1);
 
 function PlanEditor({ plan, onDone }: { plan: PlanRow | null; onDone: () => void }) {
   const router = useRouter();
-  const [amount, setAmount] = useState(plan ? (plan.amountCents / 100).toFixed(2) : "50");
+  const [amount, setAmount] = useState(plan ? centsToInput(plan.amountCents) : "50");
   const [days, setDays] = useState<number[]>(plan?.days ?? [15, 30]);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const toast = useToast();
 
   const toggleDay = (d: number) =>
     setDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort((a, b) => a - b)));
@@ -187,6 +189,7 @@ function PlanEditor({ plan, onDone }: { plan: PlanRow | null; onDone: () => void
     startTransition(async () => {
       const res = await saveAutoInvestPlan(input);
       if (!res.ok) return setError(res.error);
+      toast.show(plan ? "Auto-invest plan updated." : "Auto-invest plan created.");
       router.refresh();
       onDone();
     });
@@ -198,6 +201,7 @@ function PlanEditor({ plan, onDone }: { plan: PlanRow | null; onDone: () => void
     startTransition(async () => {
       const res = await deleteAutoInvestPlan(plan.id);
       if (!res.ok) return setError(res.error);
+      toast.show("Auto-invest plan deleted.");
       router.refresh();
       onDone();
     });

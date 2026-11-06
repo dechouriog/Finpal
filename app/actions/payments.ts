@@ -1,8 +1,10 @@
 "use server";
 
+import { safeError } from "@/lib/log";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { InsufficientFundsError, UnknownContactError, transferWithinTx } from "@/lib/payments";
+import { TOO_MANY, allow } from "@/lib/rate-limit";
 import { getCurrentUserId } from "@/lib/session";
 import { RequestId, RequestMoneyInput, SendMoneyInput } from "@/lib/validation";
 import type { ActionResult } from "./demo";
@@ -14,7 +16,7 @@ function firstIssue(error: { issues: { message: string }[] }) {
 function failure(err: unknown, fallback: string): ActionResult {
   if (err instanceof InsufficientFundsError || err instanceof UnknownContactError) return { ok: false, error: err.message };
   if (err instanceof Error && err.message.startsWith("You can't")) return { ok: false, error: err.message };
-  console.error(fallback, err);
+  console.error(fallback, safeError(err));
   return { ok: false, error: fallback };
 }
 
@@ -27,6 +29,7 @@ export async function sendMoney(input: SendMoneyInput): Promise<ActionResult> {
   const parsed = SendMoneyInput.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) };
   const fromUserId = await getCurrentUserId();
+  if (!allow("transfer", fromUserId)) return { ok: false, error: TOO_MANY };
   const { toUserId, amountCents, note } = parsed.data;
 
   try {
@@ -43,6 +46,7 @@ export async function requestMoney(input: RequestMoneyInput): Promise<ActionResu
   const parsed = RequestMoneyInput.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) };
   const requesterId = await getCurrentUserId();
+  if (!allow("transfer", requesterId)) return { ok: false, error: TOO_MANY };
   const { fromUserId, amountCents, note } = parsed.data;
   if (fromUserId === requesterId) return { ok: false, error: "You can't request money from yourself." };
   const [me, payer] = await Promise.all([
@@ -61,6 +65,7 @@ export async function payRequest(id: unknown): Promise<ActionResult> {
   const parsed = RequestId.safeParse(id);
   if (!parsed.success) return { ok: false, error: "Unknown request." };
   const userId = await getCurrentUserId();
+  if (!allow("transfer", userId)) return { ok: false, error: TOO_MANY };
 
   try {
     await prisma.$transaction(async (tx) => {

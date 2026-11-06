@@ -23,3 +23,8 @@ export function applyKey(current: string, key: string): string {
   if (/^0\d/.test(next)) next = next.slice(1); // no leading zeros
   return isAmountInput(next) ? next : current;
 }
+
+/** Cents -> plain input string for amount fields ("50.00"), never for display. */
+export function centsToInput(cents: number) {
+  return (cents / 100).toFixed(2);
+}

@@ -1,4 +1,5 @@
 import "server-only";
+import { safeError } from "@/lib/log";
 import { NextResponse } from "next/server";
 import { InsufficientFundsError } from "@/lib/payments";
 import { PayPalError } from "@/lib/paypal";
@@ -24,6 +25,6 @@ export function errorMessage(err: unknown, fallback: string) {
     return withDebugId(err.message, err.debugId);
   }
   if (err instanceof Error && /^PayPal is not configured/.test(err.message)) return err.message;
-  console.error(fallback, err instanceof Error ? err.message : err);
+  console.error(fallback, safeError(err));
   return fallback;
 }

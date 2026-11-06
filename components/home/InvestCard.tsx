@@ -5,7 +5,7 @@ import { formatCents } from "@/lib/utils";
 export function InvestCard({ valueCents, positionCount }: { valueCents: number; positionCount: number }) {
   const detail =
     positionCount === 0
-      ? "Not invested yet. Ask Finpal AI to get started."
+      ? "Not invested yet. Ask Pal to get started."
       : `${positionCount} ${positionCount === 1 ? "position" : "positions"} · Portfolio value`;
 
   return (

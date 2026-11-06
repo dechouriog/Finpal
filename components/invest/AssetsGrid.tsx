@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import { ChevronRight } from "lucide-react";
-import { finpalGridTheme } from "@/components/grid/finpalGrid";
+import { finpalGridTheme, responsiveColumns } from "@/components/grid/finpalGrid";
 import { ASSET_CATEGORY_META } from "@/lib/domain";
 import { cn, formatCents } from "@/lib/utils";
 import type { AssetRow } from "./types";
@@ -87,7 +87,7 @@ export function AssetsGrid({ rows }: { rows: AssetRow[] }) {
 
   return (
     <>
-      <div className="hidden overflow-hidden rounded-2xl ring-1 ring-line @3xl/app:block">
+      <section aria-label="Assets and positions table" className="hidden overflow-hidden rounded-2xl ring-1 ring-line @3xl/app:block">
         <AgGridReact<AssetRow>
           theme={finpalGridTheme}
           rowData={rows}
@@ -97,8 +97,10 @@ export function AssetsGrid({ rows }: { rows: AssetRow[] }) {
           domLayout="autoHeight"
           rowClass="cursor-pointer"
           onRowClicked={(e) => e.data && router.push(`/invest/${e.data.id}`)}
+          onGridSizeChanged={responsiveColumns(860, ["category", "shares"], "name")}
+          ensureDomOrder
         />
-      </div>
+      </section>
 
       <ul className="divide-y divide-line rounded-2xl bg-surface px-4 ring-1 ring-line @3xl/app:hidden">
         {[...rows]

@@ -4,11 +4,13 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, RotateCcw } from "lucide-react";
 import { resetDemoData } from "@/app/actions/demo";
+import { useToast } from "@/components/common/Toast";
 import { Button } from "@/components/ui/button";
 
 /** Two-tap reset: first tap asks for confirmation, second tap resets. */
 export function ResetDemoButton() {
   const router = useRouter();
+  const toast = useToast();
   const [confirming, setConfirming] = useState(false);
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
@@ -28,7 +30,10 @@ export function ResetDemoButton() {
     setConfirming(false);
     startTransition(async () => {
       const res = await resetDemoData();
-      setMessage(res.ok ? { ok: true, text: "Demo data restored." } : { ok: false, text: res.error });
+      if (res.ok) {
+        setMessage(null);
+        toast.show("Demo data restored. Laura's story starts again.");
+      } else setMessage({ ok: false, text: res.error });
       router.refresh();
     });
   };

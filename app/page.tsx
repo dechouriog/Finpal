@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { FinpalMark } from "@/components/brand/FinpalLogo";
 import { Avatar } from "@/components/common/Avatar";
@@ -5,10 +6,13 @@ import { AskAiBanner } from "@/components/home/AskAiBanner";
 import { BalanceCard } from "@/components/home/BalanceCard";
 import { Greeting } from "@/components/home/Greeting";
 import { InvestCard } from "@/components/home/InvestCard";
+import { PalWelcomeCard } from "@/components/pal/PalWelcomeCard";
 import { QuickActions } from "@/components/home/QuickActions";
 import { RecentActivity } from "@/components/home/RecentActivity";
 import { getPortfolioSummary, getRecentTransactions } from "@/lib/queries";
 import { getCurrentUser } from "@/lib/session";
+
+export const metadata: Metadata = { title: "Home" };
 
 export default async function HomePage() {
   const user = await getCurrentUser();
@@ -31,7 +35,9 @@ export default async function HomePage() {
         <FinpalMark size={36} className="@3xl/app:hidden" />
       </header>
 
-      <div className="grid gap-6 @3xl/app:grid-cols-5">
+      <PalWelcomeCard userId={user.id} name={user.name} />
+
+      <div className="grid grid-cols-1 gap-6 @3xl/app:grid-cols-5">
         <div className="space-y-6 @3xl/app:col-span-3">
           <BalanceCard balanceCents={user.balanceCents} />
           <QuickActions />

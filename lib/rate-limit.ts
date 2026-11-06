@@ -29,3 +29,20 @@ export function clientIp(headers: Headers) {
   if (fwd) return fwd.split(",")[0]!.trim();
   return headers.get("x-real-ip") ?? "unknown";
 }
+
+/** Per-user limits for sensitive operations (per server instance). */
+export const LIMITS = {
+  transfer: { limit: 20, windowMs: 60_000 },
+  trade: { limit: 30, windowMs: 60_000 },
+  deposit: { limit: 10, windowMs: 10 * 60_000 },
+  payout: { limit: 5, windowMs: 10 * 60_000 },
+  ai: { limit: 12, windowMs: 60_000 },
+} as const;
+
+export const TOO_MANY = "You're doing that a lot. Please wait a moment and try again.";
+
+/** True when the user may proceed. */
+export function allow(kind: keyof typeof LIMITS, userId: string) {
+  const { limit, windowMs } = LIMITS[kind];
+  return rateLimit(`${kind}:${userId}`, limit, windowMs).ok;
+}

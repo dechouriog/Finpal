@@ -1,5 +1,8 @@
+import type { Metadata } from "next";
 import { AddMoneyFlow } from "@/components/wallet/AddMoneyFlow";
 import { getCurrentUser } from "@/lib/session";
+
+export const metadata: Metadata = { title: "Add money" };
 
 export default async function AddMoneyPage() {
   const user = await getCurrentUser();

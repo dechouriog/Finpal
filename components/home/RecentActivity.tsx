@@ -14,7 +14,12 @@ export function RecentActivity({ transactions }: { transactions: Transaction[] }
         </Link>
       </div>
       {transactions.length === 0 ? (
-        <p className="py-6 text-center text-sm text-muted">No activity yet.</p>
+        <div className="py-6 text-center">
+          <p className="text-sm text-muted">No activity yet.</p>
+          <Link href="/add-money" className="mt-2 inline-block rounded text-sm font-semibold text-teal-ink hover:underline">
+            Add money with PayPal
+          </Link>
+        </div>
       ) : (
         <ul className="divide-y divide-line">
           {transactions.map((tx) => (

@@ -1,5 +1,8 @@
+import type { Metadata } from "next";
 import { WithdrawFlow } from "@/components/wallet/WithdrawFlow";
 import { getCurrentUser } from "@/lib/session";
+
+export const metadata: Metadata = { title: "Withdraw" };
 
 export default async function WithdrawPage() {
   const user = await getCurrentUser();

@@ -1,10 +1,12 @@
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
+import { safeError } from "@/lib/log";
 import { z } from "zod";
 import { jsonError } from "@/lib/api";
 import { runAgent, systemPrompt } from "@/lib/assistant/agent";
 import { consumeAiMessage, dailyLimit } from "@/lib/assistant/usage";
 import type { AssistantEvent } from "@/lib/assistant/cards";
 import { prisma } from "@/lib/db";
+import { TOO_MANY, allow } from "@/lib/rate-limit";
 import { getSessionUserId } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -37,12 +39,13 @@ export async function POST(req: Request) {
   if (!userId) return jsonError("Please start the demo first.", 401);
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return jsonError("Your demo session has expired. Start a new demo.", 401);
+  if (!allow("ai", user.id)) return jsonError(TOO_MANY, 429);
   const now = new Date();
   const encoder = new TextEncoder();
 
   if (!(await consumeAiMessage(user.id, now))) {
     const body = [
-      { t: "text", d: `You've reached today's limit of ${dailyLimit()} Finpal AI messages. Everything else in the app keeps working, and the assistant will be back tomorrow.` },
+      { t: "text", d: `You've reached today's limit of ${dailyLimit()} messages with me. Everything else in the app keeps working, and I'll be back tomorrow, fully recharged.` },
       { t: "done" },
     ] satisfies AssistantEvent[];
     return new Response(body.map((e) => `${JSON.stringify(e)}\n`).join(""), {
@@ -50,28 +53,52 @@ export async function POST(req: Request) {
     });
   }
 
+  // Stops the model work if the client disconnects (closed panel, Stop button, navigation).
+  const abort = new AbortController();
+  req.signal.addEventListener("abort", () => abort.abort());
+  let closed = false;
+
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      const emit = (e: AssistantEvent) => controller.enqueue(encoder.encode(`${JSON.stringify(e)}\n`));
+      // Never write to a stream the client has already closed.
+      const emit = (e: AssistantEvent) => {
+        if (closed) return;
+        try {
+          controller.enqueue(encoder.encode(`${JSON.stringify(e)}
+`));
+        } catch {
+          closed = true;
+          abort.abort();
+        }
+      };
       try {
         const added = await runAgent(
           parsed.data.messages as ChatCompletionMessageParam[],
           { userId: user.id, now, system: systemPrompt(user, now) },
           emit,
-          req.signal,
+          abort.signal,
         );
         emit({ t: "history", messages: added });
         emit({ t: "done" });
       } catch (err) {
-        console.error("assistant failed", err);
-        const message =
-          err instanceof Error && err.message.startsWith("The assistant is not configured")
-            ? err.message
-            : "Finpal AI is having trouble right now. Please try again.";
-        emit({ t: "error", message });
+        if (!abort.signal.aborted) {
+          console.error("assistant failed", safeError(err));
+          const message =
+            err instanceof Error && err.message.startsWith("The assistant is not configured")
+              ? err.message
+              : "Oops, I hit a snag on my side. Mind trying again in a moment?";
+          emit({ t: "error", message });
+        }
       } finally {
-        controller.close();
+        if (!closed) {
+          closed = true;
+          controller.close();
+        }
       }
+    },
+    cancel() {
+      closed = true;
+      abort.abort();
     },
   });
 

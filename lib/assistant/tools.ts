@@ -16,10 +16,17 @@ import { getInvestOverview } from "@/lib/invest";
 import { createDepositOrderViaAgentToolkit } from "@/lib/paypal";
 import { monthlyRule, nextRunDates } from "@/lib/schedule";
 import { txTitle } from "@/lib/tx-format";
+import { formatCents } from "@/lib/utils";
 import { startDeposit } from "@/lib/wallet";
 import type { AssistantCard, ReviewCard } from "./cards";
+import { PUSHBACK, PUSHBACK_OPTIONS, RiskyKind } from "./risk";
 
-export type ToolContext = { userId: string; now: Date };
+export type ToolContext = {
+  userId: string;
+  now: Date;
+  /** Set by the server when the user's message was detected as a risky request. */
+  riskyKind?: RiskyKind | null;
+};
 export type ToolOutput = { result: unknown; cards?: AssistantCard[]; steps?: string[] };
 
 type ToolSpec = {
@@ -36,7 +43,7 @@ const fn = (name: string, description: string, parameters: Record<string, unknow
   function: { name, description, parameters: { type: "object", additionalProperties: false, ...parameters } },
 });
 
-const usd = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+const usd = (cents: number) => formatCents(cents);
 
 // Plain-language risks. Fixed copy: no jargon, no promises about returns.
 const RISKS: Extract<AssistantCard, { kind: "risks" }>["items"] = [
@@ -292,7 +299,10 @@ export const TOOLS: Record<string, ToolSpec> = {
     definition: fn("explain_risks", "Show the main risks of investing in plain language as cards.", { properties: {} }),
     run: async () => ({
       cards: [{ kind: "risks", items: RISKS }],
-      result: { shown: RISKS.map((r) => r.title), note: "Risk cards are visible. Add at most one short sentence." },
+      result: {
+        shown: RISKS.map((r) => `${r.title}: ${r.body}`),
+        note: "Risk cards are visible. Switch to a calm, honest tone and add at most one short sentence.",
+      },
     }),
   },
 
@@ -390,6 +400,32 @@ export const TOOLS: Record<string, ToolSpec> = {
           shown: "Review & confirm card",
           funding: shortfall > 0 ? `${usd(shortfall)} via PayPal, rest from balance` : "Finpal balance (funded with PayPal)",
           note: "Nothing has been invested. Tell the user to review and press Confirm & fund when ready.",
+        },
+      };
+    },
+  },
+
+  flag_risky_request: {
+    label: null,
+    definition: fn(
+      "flag_risky_request",
+      "Use when the user asks for something risky: putting everything into one stock, investing the emergency fund, leverage or borrowing to invest, crypto gambling, or getting rich quick. Shows a kind pushback card with a reason and a safer alternative. Never prepare an action for that request.",
+      {
+        properties: {
+          kind: { type: "string", enum: ["single_stock", "emergency_fund", "leverage", "crypto", "quick_money"] },
+        },
+        required: ["kind"],
+      },
+    ),
+    run: async (args, ctx) => {
+      // The server's own detection wins over the model's label.
+      const kind = ctx.riskyKind ?? RiskyKind.catch("single_stock").parse((args as { kind?: string } | null)?.kind);
+      const copy = PUSHBACK[kind];
+      return {
+        cards: [{ kind: "pushback", riskKind: kind, ...copy, options: [...PUSHBACK_OPTIONS] }],
+        result: {
+          shown: `${copy.title}. ${copy.reason} Safer option: ${copy.alternative}`,
+          note: "The pushback card is visible with two quick replies. Add one or two warm sentences in your voice. Respect the user's decision: it's their money. Do not prepare any action for this request.",
         },
       };
     },

@@ -8,7 +8,7 @@ import { Loader2 } from "lucide-react";
 import { withdrawToPayPal } from "@/app/actions/wallet";
 import { SuccessCheck } from "@/components/common/SuccessCheck";
 import { Button } from "@/components/ui/button";
-import { amountToCents, isAmountInput } from "@/lib/money";
+import { amountToCents, centsToInput, isAmountInput } from "@/lib/money";
 import { formatCents } from "@/lib/utils";
 import { WithdrawInput } from "@/lib/validation";
 
@@ -91,7 +91,7 @@ export function WithdrawFlow({ balanceCents }: { balanceCents: number }) {
                   <button
                     type="button"
                     className="font-semibold text-teal-ink hover:underline"
-                    onClick={() => setAmount((balanceCents / 100).toFixed(2))}
+                    onClick={() => setAmount(centsToInput(balanceCents))}
                   >
                     Withdraw all
                   </button>

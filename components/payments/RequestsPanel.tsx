@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Inbox, Loader2 } from "lucide-react";
 import { closeRequest, payRequest } from "@/app/actions/payments";
 import { Avatar } from "@/components/common/Avatar";
+import { useToast } from "@/components/common/Toast";
 import { Button } from "@/components/ui/button";
 import { formatCents } from "@/lib/utils";
 
@@ -72,12 +73,21 @@ function RequestRow({ item, kind }: { item: RequestItem; kind: "incoming" | "out
     return () => clearTimeout(t);
   }, [confirmPay]);
 
+  const toast = useToast();
   const run = (which: "pay" | "close") => {
     setAction(which);
     setError(null);
     startTransition(async () => {
       const res = which === "pay" ? await payRequest(item.id) : await closeRequest(item.id);
       if (!res.ok) setError(res.error);
+      else
+        toast.show(
+          which === "pay"
+            ? `Paid ${formatCents(item.amountCents)} to ${item.person.name}.`
+            : kind === "incoming"
+              ? "Request declined."
+              : "Request cancelled.",
+        );
       router.refresh();
     });
   };

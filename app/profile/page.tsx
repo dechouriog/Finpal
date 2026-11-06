@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Briefcase, Cake, Mail, MapPin, type LucideIcon } from "lucide-react";
 import { FinpalLogo } from "@/components/brand/FinpalLogo";
 import { Avatar } from "@/components/common/Avatar";
@@ -6,6 +7,8 @@ import { ResetDemoButton } from "@/components/profile/ResetDemoButton";
 import { DISCLAIMER } from "@/lib/brand";
 import { getCurrentUser } from "@/lib/session";
 import { formatCents } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Profile" };
 
 export default async function ProfilePage() {
   const user = await getCurrentUser();
@@ -30,7 +33,7 @@ export default async function ProfilePage() {
         </div>
       </section>
 
-      <div className="grid gap-6 @3xl/app:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 @3xl/app:grid-cols-2">
         <section aria-labelledby="details-heading" className="rounded-2xl bg-surface p-5 ring-1 ring-line">
           <h2 id="details-heading" className="font-display text-base font-bold">
             Your details

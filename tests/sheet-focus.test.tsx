@@ -11,7 +11,7 @@ function ChatLike() {
   const [open, setOpen] = useState(true);
   const [text, setText] = useState("");
   return (
-    <Sheet open={open} onClose={() => setOpen(false)} title="Finpal AI">
+    <Sheet open={open} onClose={() => setOpen(false)} title="Pal · your investing buddy">
       <label htmlFor="msg">Message</label>
       <input id="msg" value={text} onChange={(e) => setText(e.target.value)} />
     </Sheet>

@@ -1,44 +1,48 @@
 # Render Blueprint: https://render.com/docs/blueprint-spec
+#
+# Web service only. The database is ANY PostgreSQL (Render paid Postgres, Neon or Supabase):
+# set DATABASE_URL yourself. Render's free Postgres expires after 30 days and judging runs
+# until Dec 15, 2026, so it is intentionally not used here. See README > Deploy.
 services:
   - type: web
     name: finpal
     runtime: node
-    plan: free
+    # Starter avoids free-tier cold starts during judging (free instances sleep after inactivity).
+    plan: starter
     buildCommand: >-
       npm ci --include=dev &&
-      node scripts/use-postgres.mjs &&
-      npx prisma generate &&
-      npx prisma db push --skip-generate &&
+      npx prisma generate --schema prisma/postgres/schema.prisma &&
+      npx prisma migrate deploy --schema prisma/postgres/schema.prisma &&
       npx tsx scripts/seed-if-empty.ts &&
       npm run build
     startCommand: npm run start
-    healthCheckPath: /
+    healthCheckPath: /api/health
     envVars:
       - key: NODE_VERSION
         value: "22"
+      # PostgreSQL connection string (Neon/Supabase: include ?sslmode=require).
       - key: DATABASE_URL
-        fromDatabase:
-          name: finpal-db
-          property: connectionString
+        sync: false
+      - key: AUTH_SECRET
+        generateValue: true
+      # Secret for /demo/laura?key=... (reserved recording account), 16+ characters.
+      - key: DEMO_RECORDING_KEY
+        sync: false
       - key: PAYPAL_ENV
         value: sandbox
       - key: PAYPAL_CLIENT_ID
         sync: false
       - key: PAYPAL_CLIENT_SECRET
         sync: false
+      # Same value as PAYPAL_CLIENT_ID (read at build time by the PayPal button).
       - key: NEXT_PUBLIC_PAYPAL_CLIENT_ID
+        sync: false
+      # From PayPal Developer Dashboard > your app > Webhooks (optional but recommended).
+      - key: PAYPAL_WEBHOOK_ID
         sync: false
       - key: OPENROUTER_API_KEY
         sync: false
       - key: OPENROUTER_MODEL
         value: anthropic/claude-haiku-5.5
-      - key: AUTH_SECRET
-        generateValue: true
-      - key: DEMO_RECORDING_KEY
-        sync: false
-
-databases:
-  - name: finpal-db
-    plan: free
-    databaseName: finpal
-    user: finpal
+      - key: AI_DAILY_LIMIT
+        value: "60"

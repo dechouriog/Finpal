@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import { ActivityView } from "@/components/activity/ActivityView";
 import type { ActivityRow } from "@/lib/activity";
 import { prisma } from "@/lib/db";
 import { TxStatus, TxType } from "@/lib/domain";
 import { getCurrentUser } from "@/lib/session";
 import { txTitle } from "@/lib/tx-format";
+
+export const metadata: Metadata = { title: "Activity" };
 
 export default async function ActivityPage() {
   const user = await getCurrentUser();

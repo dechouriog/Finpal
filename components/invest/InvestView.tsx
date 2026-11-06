@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { AskAiBanner } from "@/components/home/AskAiBanner";
+import { arrowKeyNav } from "@/lib/a11y";
 import { ASSET_CATEGORIES, ASSET_CATEGORY_META } from "@/lib/domain";
 import { cn, formatCents } from "@/lib/utils";
 import { AssetsGrid } from "./AssetsGrid";
@@ -37,14 +38,18 @@ export function InvestView({
   return (
     <div className="space-y-6">
       {/* Summary */}
-      <div className="grid grid-cols-3 gap-3">
-        <Stat label="Total value" value={formatCents(cashCents + investedCents)} strong />
+      <div className="grid grid-cols-2 gap-3 @3xl/app:grid-cols-3">
+        <Stat label="Total value" value={formatCents(cashCents + investedCents)} strong className="col-span-2 @3xl/app:col-span-1" />
         <Stat label="Cash available" value={formatCents(cashCents)} />
         <Stat label="Invested" value={formatCents(investedCents)} />
       </div>
 
       {/* Tabs */}
-      <div role="tablist" aria-label="Invest sections" className="flex w-fit rounded-full bg-surface p-1 ring-1 ring-line">
+      <div
+        role="tablist"
+        aria-label="Invest sections"
+        onKeyDown={arrowKeyNav(["portfolio", "auto"] as const, tab, setTab)}
+        className="flex w-fit rounded-full bg-surface p-1 ring-1 ring-line">
         {(
           [
             ["portfolio", "Portfolio"],
@@ -56,6 +61,7 @@ export function InvestView({
             role="tab"
             type="button"
             aria-selected={tab === id}
+            tabIndex={tab === id ? 0 : -1}
             onClick={() => setTab(id)}
             className={cn("relative h-9 rounded-full px-4 text-sm font-semibold", tab === id ? "text-white" : "text-muted hover:text-ink")}
           >
@@ -73,7 +79,7 @@ export function InvestView({
 
       {tab === "portfolio" ? (
         <div className="space-y-6">
-          <div className="grid items-start gap-6 @3xl/app:grid-cols-3">
+          <div className="grid grid-cols-1 items-start gap-6 @3xl/app:grid-cols-3">
             <section
               aria-labelledby="alloc-heading"
               className="flex flex-col items-center gap-4 rounded-2xl bg-surface p-5 ring-1 ring-line @3xl/app:col-span-1"
@@ -118,11 +124,11 @@ export function InvestView({
   );
 }
 
-function Stat({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+function Stat({ label, value, strong, className }: { label: string; value: string; strong?: boolean; className?: string }) {
   return (
-    <div className={cn("rounded-2xl p-4 ring-1", strong ? "bg-navy text-white ring-navy" : "bg-surface ring-line")}>
+    <div className={cn("rounded-2xl p-4 ring-1", strong ? "bg-navy text-white ring-navy" : "bg-surface ring-line", className)}>
       <p className={cn("text-xs", strong ? "text-white/75" : "text-muted")}>{label}</p>
-      <p className={cn("mt-1 truncate font-display text-base font-extrabold tabular @3xl/app:text-2xl", strong ? "text-white" : "text-ink")}>
+      <p className={cn("mt-1 truncate font-display text-lg font-extrabold tabular @3xl/app:text-2xl", strong ? "text-white" : "text-ink")}>
         {value}
       </p>
     </div>

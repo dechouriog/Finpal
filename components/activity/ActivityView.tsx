@@ -1,10 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
+import { SearchX, Wallet } from "lucide-react";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams, ValueFormatterParams } from "ag-grid-community";
-import { finpalGridTheme } from "@/components/grid/finpalGrid";
+import { finpalGridTheme, responsiveColumns } from "@/components/grid/finpalGrid";
+import { EmptyState } from "@/components/common/EmptyState";
 import { Sheet } from "@/components/common/Sheet";
+import { Button } from "@/components/ui/button";
 import { STATUS_BADGE, TYPE_BADGE, statusLabel, type ActivityRow } from "@/lib/activity";
 import { TX_TYPES, TX_TYPE_LABEL, type TxType } from "@/lib/domain";
 import { txIcon } from "@/lib/tx-display";
@@ -13,7 +17,7 @@ import { cn, formatCents } from "@/lib/utils";
 const RANGES = [
   { id: "30d", label: "30 days", days: 30 },
   { id: "90d", label: "3 months", days: 90 },
-  { id: "1y", label: "12 months", days: 365 },
+  { id: "1y", label: "1 year", days: 365 },
   { id: "all", label: "All time", days: null },
 ] as const;
 type RangeId = (typeof RANGES)[number]["id"];
@@ -70,7 +74,7 @@ export function ActivityView({ rows }: { rows: ActivityRow[] }) {
           ))}
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex rounded-full bg-bg p-1 ring-1 ring-line" role="group" aria-label="Filter by date">
+          <div className="grid w-full grid-cols-4 rounded-full bg-bg p-1 ring-1 ring-line @3xl/app:flex @3xl/app:w-auto" role="group" aria-label="Filter by date">
             {RANGES.map((r) => (
               <button
                 key={r.id}
@@ -78,7 +82,7 @@ export function ActivityView({ rows }: { rows: ActivityRow[] }) {
                 aria-pressed={range === r.id}
                 onClick={() => setRange(r.id)}
                 className={cn(
-                  "h-8 rounded-full px-3 text-xs font-semibold transition-colors",
+                  "h-8 whitespace-nowrap rounded-full px-3 text-xs font-semibold transition-colors",
                   range === r.id ? "bg-navy text-white" : "text-muted hover:text-ink",
                 )}
               >
@@ -86,22 +90,54 @@ export function ActivityView({ rows }: { rows: ActivityRow[] }) {
               </button>
             ))}
           </div>
-          <p className="text-xs text-muted tabular">
-            {filtered.length} transactions · <span className="font-semibold text-success">In {formatCents(totals.inC)}</span> ·{" "}
-            <span className="font-semibold text-ink">Out {formatCents(totals.outC)}</span>
+          <p className="flex flex-wrap gap-x-2 text-xs text-muted tabular">
+            <span className="whitespace-nowrap">{filtered.length} transactions</span>
+            <span className="whitespace-nowrap font-semibold text-success">In {formatCents(totals.inC)}</span>
+            <span className="whitespace-nowrap font-semibold text-ink">Out {formatCents(totals.outC)}</span>
           </p>
         </div>
       </div>
 
-      {/* Desktop: AG Grid */}
-      <div className="hidden @3xl/app:block">
-        <ActivityGrid rows={filtered} onSelect={setSelected} />
-      </div>
+      {rows.length === 0 ? (
+        <EmptyState
+          icon={Wallet}
+          title="No activity yet"
+          body="Add money with PayPal to make your first movement."
+          action={
+            <Button asChild>
+              <Link href="/add-money">Add money with PayPal</Link>
+            </Button>
+          }
+        />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          icon={SearchX}
+          title="No transactions match these filters"
+          action={
+            <Button
+              variant="outline"
+              onClick={() => {
+                setTypes(new Set());
+                setRange("all");
+              }}
+            >
+              Clear filters
+            </Button>
+          }
+        />
+      ) : (
+        <>
+          {/* Desktop: AG Grid */}
+          <section aria-label="Transactions table" className="hidden @3xl/app:block">
+            <ActivityGrid rows={filtered} onSelect={setSelected} />
+          </section>
 
-      {/* Mobile: list grouped by day */}
-      <div className="@3xl/app:hidden">
-        <ActivityList rows={filtered} onSelect={setSelected} />
-      </div>
+          {/* Mobile: list grouped by day */}
+          <div className="@3xl/app:hidden">
+            <ActivityList rows={filtered} onSelect={setSelected} />
+          </div>
+        </>
+      )}
 
       <Sheet open={!!selected} onClose={() => setSelected(null)} title="Transaction details" panelWidth={400}>
         {selected && <TxDetail tx={selected} />}
@@ -246,7 +282,9 @@ function ActivityGrid({ rows, onSelect }: { rows: ActivityRow[]; onSelect: (r: A
         paginationPageSizeSelector={[15, 30, 60]}
         rowClass="cursor-pointer"
         onRowClicked={(e) => e.data && onSelect(e.data)}
-        overlayNoRowsTemplate="<span style='color:#64748B'>No transactions match these filters.</span>"
+        onGridSizeChanged={responsiveColumns(860, ["status"], "createdAt")}
+        ensureDomOrder
+        overlayNoRowsTemplate="<span style='color:#5C6B80'>No transactions match these filters.</span>"
       />
     </div>
   );
@@ -275,9 +313,6 @@ function ActivityList({ rows, onSelect }: { rows: ActivityRow[]; onSelect: (r: A
     return out;
   }, [rows]);
 
-  if (groups.length === 0) {
-    return <p className="rounded-2xl bg-surface p-6 text-center text-sm text-muted ring-1 ring-line">No transactions match these filters.</p>;
-  }
 
   return (
     <div className="space-y-4">

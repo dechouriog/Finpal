@@ -21,17 +21,17 @@ export const TYPE_BADGE: Record<TxType, string> = {
   DEPOSIT: "bg-teal-soft text-teal-ink",
   WITHDRAW: "bg-navy-soft text-navy",
   SEND: "bg-bg text-ink ring-1 ring-line",
-  RECEIVE: "bg-[#DCFCE7] text-[#166534]",
-  BUY: "bg-[#FEF3C7] text-[#92400E]",
-  SELL: "bg-[#FEF3C7] text-[#92400E]",
+  RECEIVE: "bg-success-soft text-success-ink",
+  BUY: "bg-amber-soft text-amber-ink",
+  SELL: "bg-amber-soft text-amber-ink",
   AUTO_INVEST: "bg-teal-soft text-teal-ink",
-  REFUND: "bg-[#FEE2E2] text-[#991B1B]",
+  REFUND: "bg-danger-soft text-danger-ink",
 };
 
 export const STATUS_BADGE: Record<TxStatus, string> = {
-  COMPLETED: "bg-[#DCFCE7] text-[#166534]",
-  PENDING: "bg-[#FEF3C7] text-[#92400E]",
-  FAILED: "bg-[#FEE2E2] text-[#991B1B]",
+  COMPLETED: "bg-success-soft text-success-ink",
+  PENDING: "bg-amber-soft text-amber-ink",
+  FAILED: "bg-danger-soft text-danger-ink",
 };
 
 export function statusLabel(s: TxStatus) {

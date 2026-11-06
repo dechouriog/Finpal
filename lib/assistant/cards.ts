@@ -46,6 +46,16 @@ export type RisksCard = {
 
 export type ChoicesCard = { kind: "choices"; options: string[] };
 
+/** Pal's kind pushback on a risky request: a reason and a safer option. Never an action. */
+export type PushbackCard = {
+  kind: "pushback";
+  riskKind: string;
+  title: string;
+  reason: string;
+  alternative: string;
+  options: string[];
+};
+
 export type ReviewCard = {
   kind: "review";
   amountCents: number;
@@ -61,7 +71,15 @@ export type ReviewCard = {
   autoInvest: { amountCents: number; days: number[]; nextRuns: string[] } | null;
 };
 
-export type AssistantCard = CashflowCard | SpendingCard | ProfileCard | PortfolioCard | RisksCard | ChoicesCard | ReviewCard;
+export type AssistantCard =
+  | CashflowCard
+  | SpendingCard
+  | ProfileCard
+  | PortfolioCard
+  | RisksCard
+  | ChoicesCard
+  | PushbackCard
+  | ReviewCard;
 
 /** Events streamed from /api/assistant as newline-delimited JSON. */
 export type AssistantEvent =

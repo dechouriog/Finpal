@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { CalendarClock, Clock, ShieldCheck, TrendingDown, Wallet } from "lucide-react";
+import { CalendarClock, Clock, Lightbulb, ShieldAlert, ShieldCheck, TrendingDown, Wallet } from "lucide-react";
 import { Donut } from "@/components/invest/Donut";
 import { Button } from "@/components/ui/button";
 import type {
@@ -9,6 +9,7 @@ import type {
   CashflowCard,
   PortfolioCard,
   ProfileCard,
+  PushbackCard,
   ReviewCard,
   RisksCard,
   SpendingCard,
@@ -46,6 +47,8 @@ export function CardView({
       return <Risks card={card} />;
     case "review":
       return <ReviewSummary card={card} onReview={onReview} />;
+    case "pushback":
+      return <Pushback card={card} interactive={interactive} onChoice={onChoice} />;
     case "choices":
       return interactive ? (
         <motion.div {...enter} className="flex flex-wrap gap-2" role="group" aria-label="Quick replies">
@@ -125,7 +128,7 @@ function Spending({ card }: { card: SpendingCard }) {
                 className="h-full rounded-full bg-navy"
                 initial={{ width: 0 }}
                 animate={{ width: `${(c.cents / max) * 100}%` }}
-                transition={{ duration: 0.6, delay: 0.1 + i * 0.08, ease: "easeOut" }}
+                transition={{ duration: 0.5, delay: 0.1 + i * 0.08, ease: "easeOut" }}
               />
             </div>
           </li>
@@ -190,7 +193,7 @@ function Portfolio({ card }: { card: PortfolioCard }) {
 
 const RISK_STYLE = {
   danger: { bar: "bg-danger", icon: TrendingDown, iconClass: "text-danger" },
-  amber: { bar: "bg-amber", icon: Clock, iconClass: "text-[#B45309]" },
+  amber: { bar: "bg-amber", icon: Clock, iconClass: "text-amber-ink" },
   teal: { bar: "bg-teal", icon: Wallet, iconClass: "text-teal-ink" },
 } as const;
 
@@ -238,6 +241,52 @@ function ReviewSummary({ card, onReview }: { card: ReviewCard; onReview: (c: Rev
         Review &amp; confirm
       </Button>
       <p className="mt-2 text-center text-[11px] text-muted">Nothing happens until you confirm.</p>
+    </Shell>
+  );
+}
+
+/** Pal's kind pushback on a risky request: reason + safer option + the user's choice. Never an action. */
+function Pushback({
+  card,
+  interactive,
+  onChoice,
+}: {
+  card: PushbackCard;
+  interactive: boolean;
+  onChoice: (t: string) => void;
+}) {
+  return (
+    <Shell className="relative overflow-hidden pl-5">
+      <span aria-hidden className="absolute inset-y-0 left-0 w-1.5 bg-amber" />
+      <p className="flex items-center gap-2 font-display text-sm font-bold text-ink">
+        <ShieldAlert className="size-4 text-amber-ink" aria-hidden />
+        {card.title}
+      </p>
+      <p className="mt-1.5 text-xs text-muted">{card.reason}</p>
+      <div className="mt-3 rounded-xl bg-teal-soft p-3">
+        <p className="flex items-center gap-1.5 text-xs font-semibold text-teal-ink">
+          <Lightbulb className="size-3.5" aria-hidden />A safer idea
+        </p>
+        <p className="mt-0.5 text-xs text-ink">{card.alternative}</p>
+      </div>
+      {interactive && (
+        <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Your choice">
+          {card.options.map((o, i) => (
+            <button
+              key={o}
+              type="button"
+              onClick={() => onChoice(o)}
+              className={cn(
+                "rounded-full px-3.5 py-2 text-sm font-semibold ring-1 transition-colors",
+                i === 0 ? "bg-teal text-deep ring-teal hover:bg-teal-strong" : "bg-surface text-navy ring-navy/30 hover:bg-navy-soft",
+              )}
+            >
+              {o}
+            </button>
+          ))}
+        </div>
+      )}
+      <p className="mt-2 text-[11px] text-muted">Your money, your call. Nothing has been prepared for this request.</p>
     </Shell>
   );
 }

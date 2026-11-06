@@ -6,7 +6,7 @@ export function BalanceCard({ balanceCents }: { balanceCents: number }) {
   return (
     <section
       aria-labelledby="balance-label"
-      className="relative overflow-hidden rounded-3xl bg-navy p-6 text-white shadow-[0_20px_40px_-24px_rgba(11,61,145,0.8)]"
+      className="relative overflow-hidden rounded-3xl bg-navy p-6 text-white shadow-hero"
     >
       {/* decorative shapes */}
       <span aria-hidden className="absolute -right-10 -top-14 size-44 rounded-full bg-teal/25" />
@@ -22,7 +22,7 @@ export function BalanceCard({ balanceCents }: { balanceCents: number }) {
       <div className="relative mt-5 flex flex-wrap items-center gap-x-4 gap-y-2">
         <Link
           href="/add-money"
-          className="inline-flex h-10 items-center gap-1.5 rounded-full bg-teal px-4 text-sm font-bold text-deep transition-colors hover:bg-[#00ad96] focus-visible:outline-white"
+          className="inline-flex h-10 items-center gap-1.5 rounded-full bg-teal px-4 text-sm font-bold text-deep transition-colors hover:bg-teal-strong focus-visible:outline-white"
         >
           <Plus className="size-4" strokeWidth={3} aria-hidden />
           Add money

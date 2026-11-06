@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { consumeAiMessage } from "@/lib/assistant/usage";
 import { newSpace } from "./helpers";
 
-describe("Finpal AI daily budget", () => {
+describe("Pal daily message budget", () => {
   afterEach(() => {
     process.env.AI_DAILY_LIMIT = "60";
   });

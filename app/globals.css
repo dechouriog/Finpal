@@ -1,4 +1,9 @@
-@import "tailwindcss";
+/* Only scan source folders for classes: otherwise every file in the project (the SQLite DB,
+   tests, docs) becomes a CSS dependency and any write triggers a dev recompile. */
+@import "tailwindcss" source(none);
+@source "../app";
+@source "../components";
+@source "../lib";
 
 /* ------------------------------------------------------------------
  * Finpal brand tokens
@@ -13,16 +18,30 @@
   --color-bg: #f6f8fb;
   --color-surface: #ffffff;
   --color-ink: #0f172a;
-  --color-muted: #64748b;
+  --color-muted: #5c6b80; /* #64748B darkened to pass WCAG AA on every light surface */
   --color-line: #e2e8f0;
-  --color-success: #16a34a;
+  --color-success: #12823b; /* #16A34A darkened: green amounts on white pass AA */
   --color-danger: #dc2626;
   --color-amber: #f59e0b;
 
   /* Slightly darker teal for text on white (AA contrast) */
-  --color-teal-ink: #00806f;
+  --color-teal-ink: #007a69;
+  /* Interaction and status tints (one scale, no one-off hex values in components) */
+  --color-teal-strong: #00ad96; /* teal hover */
+  --color-teal-tint: #d8f6f1; /* teal-soft hover */
+  --color-danger-strong: #b91c1c; /* danger hover */
+  --color-success-soft: #dcfce7;
+  --color-success-ink: #166534;
+  --color-amber-soft: #fef3c7;
+  --color-amber-ink: #92400e;
+  --color-danger-soft: #fee2e2;
+  --color-danger-ink: #991b1b;
 
-  --radius-card: 1.25rem;
+  /* Elevation scale */
+  --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.05);
+  --shadow-pop: 0 12px 30px -8px rgb(11 61 145 / 0.55);
+  --shadow-hero: 0 20px 40px -24px rgb(11 61 145 / 0.8);
+  --shadow-device: 0 30px 80px -20px rgb(6 26 63 / 0.45);
 
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -57,4 +76,27 @@
 
 @utility tabular {
   font-variant-numeric: tabular-nums;
+}
+
+/* Respect reduced-motion: keep feedback, drop movement. (framer-motion is configured in DeviceViewer.) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Skeleton shimmer */
+@keyframes finpal-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@utility skeleton {
+  background: linear-gradient(90deg, var(--color-line) 25%, #edf1f6 37%, var(--color-line) 63%);
+  background-size: 400% 100%;
+  animation: finpal-shimmer 1.4s ease-out infinite;
 }

@@ -7,10 +7,10 @@ import { DISCLAIMER } from "@/lib/brand";
 import { prisma } from "@/lib/db";
 import { getSessionUserId } from "@/lib/session";
 
-export const metadata: Metadata = { title: "Welcome · Finpal" };
+export const metadata: Metadata = { title: "Welcome" };
 
 const POINTS = [
-  { icon: Sparkles, title: "A guide, not a broker", body: "Finpal AI learns your goals and explains every step in plain language." },
+  { icon: Sparkles, title: "A guide, not a broker", body: "Pal, your investing buddy, learns your goals and explains every step in plain language." },
   { icon: ShieldCheck, title: "Safety net first", body: "Three months of expenses stay in cash before anything is invested." },
   { icon: CalendarClock, title: "Small and steady", body: "Start with what's ready today and add a little every payday." },
 ];

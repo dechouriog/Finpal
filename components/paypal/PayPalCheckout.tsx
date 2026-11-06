@@ -62,7 +62,16 @@ export function PayPalCheckout(props: Props) {
     );
   }
   return (
-    <PayPalScriptProvider options={{ clientId: CLIENT_ID, currency: "USD", intent: "capture", components: "buttons" }}>
+    <PayPalScriptProvider
+      options={{
+        clientId: CLIENT_ID,
+        currency: "USD",
+        intent: "capture",
+        components: "buttons",
+        // PayPal wallet + "Debit or Credit Card" (sandbox test cards work, no PayPal account needed).
+        disableFunding: "paylater,venmo,credit",
+      }}
+    >
       <Buttons {...props} />
     </PayPalScriptProvider>
   );
@@ -93,10 +102,9 @@ function Buttons({ amountCents, orderId, disabled, onProcessing, onSuccess, onEr
         </div>
       )}
       <PayPalButtons
-        fundingSource="paypal"
         disabled={disabled}
         forceReRender={[disabled]}
-        style={{ layout: "horizontal", shape: "pill", height: 48, tagline: false, label: "pay" }}
+        style={{ layout: "vertical", shape: "pill", height: 48, label: "pay" }}
         createOrder={async () => {
           try {
             if (latest.current.orderId) {

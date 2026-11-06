@@ -24,3 +24,7 @@ prisma/*.db-journal
 *.mp4
 prisma/test.db
 prisma/test.db-journal
+.next-e2e/
+prisma/e2e.db*
+test-results/
+playwright-report/

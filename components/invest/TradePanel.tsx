@@ -7,7 +7,8 @@ import { Loader2 } from "lucide-react";
 import { buyAsset, sellAsset } from "@/app/actions/invest";
 import { SuccessCheck } from "@/components/common/SuccessCheck";
 import { Button } from "@/components/ui/button";
-import { amountToCents, isAmountInput } from "@/lib/money";
+import { arrowKeyNav } from "@/lib/a11y";
+import { amountToCents, centsToInput, isAmountInput } from "@/lib/money";
 import { cn, formatCents } from "@/lib/utils";
 import { AmountCents } from "@/lib/validation";
 
@@ -84,13 +85,22 @@ export function TradePanel({
           </motion.div>
         ) : (
           <motion.div key="form" exit={{ opacity: 0 }} className="space-y-4">
-            <div role="tablist" aria-label="Order side" className="grid grid-cols-2 rounded-full bg-bg p-1 ring-1 ring-line">
+            <div
+              role="tablist"
+              aria-label="Order side"
+              onKeyDown={arrowKeyNav(["buy", "sell"] as const, side, (s) => {
+                setSide(s);
+                setError(null);
+                setSellAll(false);
+              })}
+              className="grid grid-cols-2 rounded-full bg-bg p-1 ring-1 ring-line">
               {(["buy", "sell"] as const).map((s) => (
                 <button
                   key={s}
                   role="tab"
                   type="button"
                   aria-selected={side === s}
+                  tabIndex={side === s ? 0 : -1}
                   disabled={s === "sell" && positionValueCents === 0}
                   onClick={() => {
                     setSide(s);
@@ -117,7 +127,7 @@ export function TradePanel({
                   id={inputId}
                   inputMode="decimal"
                   placeholder="0.00"
-                  value={sellAll ? (positionValueCents / 100).toFixed(2) : amount}
+                  value={sellAll ? centsToInput(positionValueCents) : amount}
                   onChange={(e) => {
                     const v = e.target.value.replace(/[^\d.]/g, "");
                     if (isAmountInput(v)) setAmount(v);

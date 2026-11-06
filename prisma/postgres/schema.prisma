@@ -1,0 +1,178 @@
+// GENERATED from prisma/schema.prisma by scripts/sync-postgres-schema.mjs. Do not edit by hand.
+// After changing the schema: run this script, then create a migration against a PostgreSQL database:
+//   npx prisma migrate dev --schema prisma/postgres/schema.prisma
+
+// Finpal data model.
+// Local: SQLite. Production (Render): PostgreSQL (provider swapped at build time, see README).
+// Money is ALWAYS stored as integer cents. Enum-like fields are strings validated with zod
+// (lib/domain.ts) so the schema stays portable between SQLite and PostgreSQL.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  // Reserved recording space uses stable ids "laura", "maria", "sam"; demo spaces use random ids.
+  id           String   @id
+  // Isolation: users only see and pay users of their own space. A space's id is its main user's id.
+  spaceId      String
+  // true for accounts created by "Try the demo" (and their seeded contacts); cleaned up after 7 days
+  isDemo       Boolean  @default(false)
+  name         String
+  fullName     String
+  email        String   @unique
+  handle       String   @unique
+  age          Int
+  occupation   String
+  city         String
+  avatarColor  String // hex color for the initial avatar
+  // Pal's growth stage (seed | sprout | plant | tree), driven by the user's progress; never goes back
+  palStage     String   @default("seed")
+  balanceCents Int
+  createdAt    DateTime @default(now())
+
+  transactions     Transaction[]
+  positions        Position[]
+  riskProfile      RiskProfile?
+  autoInvestEvents AutoInvestEvent[]
+  requestsMade     MoneyRequest[] @relation("RequestRequester")
+  requestsToPay    MoneyRequest[] @relation("RequestPayer")
+
+  @@index([spaceId])
+  @@index([isDemo, createdAt])
+}
+
+/// A user asks another user for money. Paying it creates a SEND/RECEIVE pair.
+model MoneyRequest {
+  id          String    @id @default(cuid())
+  requesterId String
+  requester   User      @relation("RequestRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  payerId     String
+  payer       User      @relation("RequestPayer", fields: [payerId], references: [id], onDelete: Cascade)
+  amountCents Int
+  note        String?
+  // PENDING | PAID | DECLINED | CANCELED
+  status      String    @default("PENDING")
+  createdAt   DateTime  @default(now())
+  resolvedAt  DateTime?
+
+  @@index([payerId, status])
+  @@index([requesterId, status])
+}
+
+model Transaction {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // DEPOSIT | WITHDRAW | SEND | RECEIVE | BUY | SELL | AUTO_INVEST
+  type         String
+  // Spending/income category used for cashflow analysis (client, rent, groceries, ...)
+  category     String
+  counterparty String
+  // Signed integer cents: positive = money in, negative = money out
+  amountCents  Int
+  // Seeded history (shown as "Demo data" in Activity)
+  isSeed       Boolean  @default(false)
+  // COMPLETED | PENDING | FAILED
+  status       String   @default("COMPLETED")
+  note         String?
+  // PayPal order / payout id when the movement went through the sandbox
+  externalRef  String?
+  // Investment movements
+  assetId      String?
+  asset        Asset?   @relation(fields: [assetId], references: [id])
+  shares       Float?
+  createdAt    DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model Asset {
+  id          String @id // slug, e.g. "total-market-index"
+  name        String
+  // INDEX | BOND | GROWTH
+  category    String
+  // Fixed demo price. TODO(prices): replace with a real market data feed.
+  priceCents  Int
+  description String
+
+  positions    Position[]
+  transactions Transaction[]
+}
+
+model Position {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assetId   String
+  asset     Asset    @relation(fields: [assetId], references: [id])
+  // Fractional shares are allowed; value is always rounded to integer cents.
+  shares    Float
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, assetId])
+}
+
+model RiskProfile {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  experience String // none | some | experienced
+  goal       String
+  horizon    String // short | medium | long
+  tolerance  String // sell | wait | buy_more
+  level      String // CONSERVATIVE | MODERATE | AGGRESSIVE
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model AutoInvestEvent {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name           String
+  amountCents    Int
+  startDate      DateTime
+  endDate        DateTime
+  // iCal RRULE (e.g. "FREQ=MONTHLY;BYMONTHDAY=15"), understood by Bryntum Calendar
+  recurrenceRule String?
+  createdAt      DateTime @default(now())
+}
+
+/// Every PayPal order Finpal creates. The source of truth for crediting a deposit exactly once.
+model PaymentOrder {
+  id            String   @id @default(cuid()) // also used as the PayPal-Request-Id for create
+  userId        String
+  paypalOrderId String?  @unique
+  amountCents   Int
+  // CREATING | CREATED | PENDING | COMPLETED | DECLINED | CANCELED | FAILED | REFUNDED
+  status        String   @default("CREATING")
+  captureId     String?  @unique
+  transactionId String?  @unique // the Finpal ledger row for this deposit
+  debugId       String? // PayPal debug id of the last error, for support
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId, createdAt])
+}
+
+/// Processed PayPal webhook events (dedup: each event id is handled once).
+model WebhookEvent {
+  id         String   @id // PayPal event id
+  type       String
+  receivedAt DateTime @default(now())
+}
+
+/// Finpal AI messages per user per UTC day (daily budget).
+model AiUsage {
+  userId String
+  day    String // YYYY-MM-DD (UTC)
+  count  Int    @default(0)
+
+  @@id([userId, day])
+}

@@ -6,8 +6,12 @@ import { errorMessage } from "@/lib/api";
 import { RiskLevel, RISK_LABEL, buildAllocation } from "@/lib/allocation";
 import { prisma } from "@/lib/db";
 import { buyWithinTx, sellWithinTx } from "@/lib/invest";
+import type { PalStage } from "@/lib/pal";
+import { syncPalStage } from "@/lib/pal-stage";
 import { monthlyRule, nextRunDates } from "@/lib/schedule";
+import { TOO_MANY, allow } from "@/lib/rate-limit";
 import { getCurrentUserId } from "@/lib/session";
+import { formatCents } from "@/lib/utils";
 import { AmountCents, AutoInvestPlanInput, MonthDays, TradeInput } from "@/lib/validation";
 import type { ActionResult } from "./demo";
 
@@ -19,11 +23,13 @@ export async function buyAsset(input: TradeInput): Promise<ActionResult> {
   const parsed = TradeInput.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
   const userId = await getCurrentUserId();
+  if (!allow("trade", userId)) return { ok: false, error: TOO_MANY };
   try {
     await prisma.$transaction((tx) => buyWithinTx(tx, { userId, ...parsed.data }));
   } catch (err) {
     return { ok: false, error: errorMessage(err, "The order could not be completed.") };
   }
+  await syncPalStage(userId);
   refresh();
   return { ok: true };
 }
@@ -32,6 +38,7 @@ export async function sellAsset(input: TradeInput): Promise<ActionResult> {
   const parsed = TradeInput.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
   const userId = await getCurrentUserId();
+  if (!allow("trade", userId)) return { ok: false, error: TOO_MANY };
   try {
     await prisma.$transaction((tx) => sellWithinTx(tx, { userId, ...parsed.data }));
   } catch (err) {
@@ -49,7 +56,7 @@ export async function saveAutoInvestPlan(input: AutoInvestPlanInput): Promise<Ac
   const { id, amountCents, days } = parsed.data;
   const now = new Date();
   const data = {
-    name: `Auto-invest $${(amountCents / 100).toFixed(2)}`,
+    name: `Auto-invest ${formatCents(amountCents)}`,
     amountCents,
     recurrenceRule: monthlyRule(days),
   };
@@ -67,6 +74,7 @@ export async function saveAutoInvestPlan(input: AutoInvestPlanInput): Promise<Ac
       },
     });
   }
+  await syncPalStage(userId);
   refresh();
   return { ok: true };
 }
@@ -88,7 +96,7 @@ const StarterPortfolioInput = z.object({
 export type StarterPortfolioInput = z.input<typeof StarterPortfolioInput>;
 
 export type StarterPortfolioResult =
-  | { ok: true; investedCents: number; nextRuns: string[]; balanceCents: number }
+  | { ok: true; investedCents: number; nextRuns: string[]; balanceCents: number; stage: PalStage; grew: boolean }
   | { ok: false; error: string };
 
 /**
@@ -120,7 +128,7 @@ export async function confirmStarterPortfolio(input: StarterPortfolioInput): Pro
           await tx.autoInvestEvent.create({
             data: {
               userId,
-              name: `Auto-invest $${(autoInvest.amountCents / 100).toFixed(2)} · ${RISK_LABEL[level]}`,
+              name: `Auto-invest ${formatCents(autoInvest.amountCents)} · ${RISK_LABEL[level]}`,
               amountCents: autoInvest.amountCents,
               recurrenceRule: monthlyRule(autoInvest.days),
               startDate: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 12)),
@@ -137,6 +145,7 @@ export async function confirmStarterPortfolio(input: StarterPortfolioInput): Pro
 
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { balanceCents: true } });
   const nextRuns = autoInvest ? nextRunDates(monthlyRule(autoInvest.days), now, 4).map((d) => d.toISOString()) : [];
+  const pal = await syncPalStage(userId);
   refresh();
-  return { ok: true, investedCents: amountCents, nextRuns, balanceCents: user.balanceCents };
+  return { ok: true, investedCents: amountCents, nextRuns, balanceCents: user.balanceCents, stage: pal.stage, grew: pal.grew };
 }

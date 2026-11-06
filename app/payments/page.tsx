@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import { PaymentFlow, type Contact } from "@/components/payments/PaymentFlow";
 import { RequestsPanel, type RequestItem } from "@/components/payments/RequestsPanel";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
+
+export const metadata: Metadata = { title: "Payments" };
 
 const personSelect = { name: true, fullName: true, avatarColor: true } as const;
 
@@ -38,7 +41,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
   return (
     <div className="space-y-6">
       <h1 className="font-display text-2xl font-extrabold tracking-tight text-ink @3xl/app:text-3xl">Payments</h1>
-      <div className="grid items-start gap-6 @3xl/app:grid-cols-5">
+      <div className="grid grid-cols-1 items-start gap-6 @3xl/app:grid-cols-5">
         <div className="@3xl/app:col-span-3">
           <PaymentFlow
             // Remount when the user switches, so a half-finished flow doesn't leak across accounts.

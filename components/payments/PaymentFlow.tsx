@@ -10,6 +10,7 @@ import { Avatar } from "@/components/common/Avatar";
 import { SuccessCheck } from "@/components/common/SuccessCheck";
 import { AmountKeypad } from "@/components/payments/AmountKeypad";
 import { Button } from "@/components/ui/button";
+import { arrowKeyNav } from "@/lib/a11y";
 import { amountToCents, applyKey, isAmountInput } from "@/lib/money";
 import { cn, formatCents } from "@/lib/utils";
 import { AmountCents } from "@/lib/validation";
@@ -101,13 +102,18 @@ export function PaymentFlow({
   return (
     <section aria-label={isSend ? "Send money" : "Request money"} className="rounded-3xl bg-surface p-5 ring-1 ring-line @3xl/app:p-7">
       {/* Send | Request */}
-      <div role="tablist" aria-label="Payment type" className="mb-5 grid grid-cols-2 rounded-full bg-bg p-1 ring-1 ring-line">
+      <div
+        role="tablist"
+        aria-label="Payment type"
+        onKeyDown={arrowKeyNav(["send", "request"] as const, mode, switchMode)}
+        className="mb-5 grid grid-cols-2 rounded-full bg-bg p-1 ring-1 ring-line">
         {(["send", "request"] as const).map((m) => (
           <button
             key={m}
             type="button"
             role="tab"
             aria-selected={mode === m}
+            tabIndex={mode === m ? 0 : -1}
             onClick={() => switchMode(m)}
             className={cn(
               "relative h-9 rounded-full text-sm font-semibold transition-colors",

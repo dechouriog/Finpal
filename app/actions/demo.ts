@@ -1,5 +1,6 @@
 "use server";
 
+import { safeError } from "@/lib/log";
 import { revalidatePath } from "next/cache";
 import { AuthError, CredentialsSignin } from "next-auth";
 import { signIn, signOut } from "@/auth";
@@ -39,7 +40,7 @@ export async function resetDemoData(): Promise<ActionResult> {
     revalidatePath("/", "layout");
     return { ok: true };
   } catch (err) {
-    console.error("resetDemoData failed", err);
+    console.error("resetDemoData failed", safeError(err));
     return { ok: false, error: "Could not reset demo data. Please try again." };
   }
 }

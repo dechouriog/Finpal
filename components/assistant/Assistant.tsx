@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, Loader2, RotateCcw, SendHorizontal, Square, X } from "lucide-react";
-import { SparkleIcon } from "@/components/brand/SparkleIcon";
 import { Sheet } from "@/components/common/Sheet";
 import { OPEN_ASSISTANT_EVENT } from "@/components/home/AskAiBanner";
+import { liveMood, moodForTurn } from "@/components/pal/mood";
+import type { PalMood } from "@/components/pal/Pal";
+import { PalAvatar, PalLauncher, PalThinking } from "@/components/pal/PalParts";
 import { AppPortal } from "@/components/shell/AppPortal";
 import type { AssistantCard, AssistantEvent, ReviewCard } from "@/lib/assistant/cards";
 import { cn } from "@/lib/utils";
@@ -14,7 +16,11 @@ import { RichText } from "./RichText";
 import { ReviewScreen } from "./ReviewScreen";
 
 type Step = { id: string; label: string; status: "running" | "done" | "error" };
-type Block = { type: "text"; text: string } | { type: "steps"; steps: Step[] } | { type: "card"; card: AssistantCard };
+type Block =
+  | { type: "text"; text: string }
+  | { type: "error"; text: string }
+  | { type: "steps"; steps: Step[] }
+  | { type: "card"; card: AssistantCard };
 type ChatItem = { id: string; role: "user"; text: string } | { id: string; role: "assistant"; blocks: Block[] };
 
 const SHORTCUTS = ["How did I spend this month?", "Explain my portfolio", "Help me start investing"];
@@ -38,9 +44,25 @@ function applyEvent(blocks: Block[], e: AssistantEvent): Block[] {
   } else if (e.t === "card") {
     out.push({ type: "card", card: e.card });
   } else if (e.t === "error") {
-    out.push({ type: "text", text: e.message });
+    out.push({ type: "error", text: e.message });
   }
   return out;
+}
+
+/** First name from the Auth.js session, for Pal's greeting. */
+function useFirstName() {
+  const [name, setName] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/auth/session")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((s: { user?: { name?: string } } | null) => alive && setName(s?.user?.name?.split(" ")[0] ?? null))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return name;
 }
 
 export function Assistant() {
@@ -48,10 +70,12 @@ export function Assistant() {
   const [items, setItems] = useState<ChatItem[]>([]);
   const [history, setHistory] = useState<unknown[]>([]);
   const [input, setInput] = useState("");
+  const [inputFocused, setInputFocused] = useState(false);
   const [busy, setBusy] = useState(false);
   const [review, setReview] = useState<ReviewCard | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const firstName = useFirstName();
 
   useEffect(() => {
     const onOpen = (e: Event) => {
@@ -116,7 +140,7 @@ export function Assistant() {
       }
     } catch (err) {
       if ((err as Error).name === "AbortError") update({ t: "text", d: "\n\n(Stopped)" });
-      else update({ t: "error", message: "I couldn't reach Finpal AI. Please try again." });
+      else update({ t: "error", message: "Oops, I lost my train of thought for a second. Mind trying again?" });
     } finally {
       // Keep the user's message in history even if the reply failed, so context isn't lost.
       if (!gotHistory) setHistory(outgoing);
@@ -133,40 +157,27 @@ export function Assistant() {
     setBusy(false);
   };
 
-  const lastAssistantId = [...items].reverse().find((i) => i.role === "assistant")?.id;
+  const lastAssistant = [...items].reverse().find((i): i is Extract<ChatItem, { role: "assistant" }> => i.role === "assistant");
+  const mood = liveMood({
+    busy,
+    typing: inputFocused && input.trim().length > 0,
+    hasMessages: items.length > 0,
+    lastTurn: lastAssistant?.blocks ?? null,
+  });
 
   return (
     <>
-      {/* Floating entry point on every screen */}
+      {/* Pal peeks from the corner on every screen */}
       <AppPortal>
-        <AnimatePresence>
-          {!open && (
-            <motion.button
-              type="button"
-              onClick={() => setOpen(true)}
-              aria-label="Ask Finpal AI"
-              initial={{ scale: 0.6, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.6, opacity: 0 }}
-              transition={{ duration: 0.25, ease: "easeOut" }}
-              className="absolute bottom-[84px] right-4 grid size-14 place-items-center rounded-full bg-navy text-teal shadow-[0_12px_30px_-8px_rgba(11,61,145,0.7)] ring-4 ring-white @3xl/app:bottom-16 @3xl/app:right-8"
-            >
-              <SparkleIcon size={26} />
-            </motion.button>
-          )}
-        </AnimatePresence>
+        <AnimatePresence>{!open && <PalLauncher key="pal-launcher" onOpen={() => setOpen(true)} />}</AnimatePresence>
       </AppPortal>
 
       <Sheet
         open={open}
         onClose={() => setOpen(false)}
-        title="Finpal AI"
+        title="Pal · your investing buddy"
         subtitle="Education, not financial advice"
-        icon={
-          <span className="grid size-10 place-items-center rounded-full bg-teal-soft text-teal">
-            <SparkleIcon size={20} />
-          </span>
-        }
+        icon={<PalAvatar mood={mood} size={34} />}
         headerAction={
           items.length > 0 ? (
             <button
@@ -184,10 +195,10 @@ export function Assistant() {
         mobileHeight="90%"
         backdropOnDesktop={false}
       >
-        <div className="relative flex h-full flex-col">
+        <div className="relative flex h-full flex-col" data-pal-mood={mood}>
           <div ref={scrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4" aria-live="polite">
             {items.length === 0 ? (
-              <Welcome onPick={(t) => void send(t)} />
+              <Welcome name={firstName} onPick={(t) => void send(t)} />
             ) : (
               items.map((it) =>
                 it.role === "user" ? (
@@ -203,9 +214,16 @@ export function Assistant() {
                 ) : (
                   <BotTurn
                     key={it.id}
+                    mood={it.id === lastAssistant?.id ? mood : moodForTurn(it.blocks)}
+                    live={it.id === lastAssistant?.id}
+                    onRetry={() => {
+                      const idx = items.indexOf(it);
+                      const prev = items.slice(0, idx).reverse().find((x) => x.role === "user");
+                      if (prev && prev.role === "user") void send(prev.text);
+                    }}
                     blocks={it.blocks}
-                    pending={busy && it.id === lastAssistantId}
-                    interactive={!busy && it.id === lastAssistantId}
+                    pending={busy && it.id === lastAssistant?.id}
+                    interactive={!busy && it.id === lastAssistant?.id}
                     onChoice={(t) => void send(t)}
                     onReview={setReview}
                   />
@@ -222,12 +240,14 @@ export function Assistant() {
             className="flex shrink-0 items-center gap-2 border-t border-line bg-surface p-3"
           >
             <label htmlFor="assistant-input" className="sr-only">
-              Message Finpal AI
+              Message Pal
             </label>
             <input
               id="assistant-input"
               value={input}
               onChange={(e) => setInput(e.target.value)}
+              onFocus={() => setInputFocused(true)}
+              onBlur={() => setInputFocused(false)}
               placeholder="Ask anything about your money…"
               autoComplete="off"
               maxLength={2000}
@@ -262,14 +282,17 @@ export function Assistant() {
   );
 }
 
-function Welcome({ onPick }: { onPick: (t: string) => void }) {
+function Welcome({ name, onPick }: { name: string | null; onPick: (t: string) => void }) {
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-      <div className="w-fit max-w-[90%] rounded-2xl rounded-bl-md bg-navy-soft px-4 py-3 text-sm text-ink">
-        Hi! I&apos;m Finpal AI. I can explain your spending, your portfolio, and help you start investing step by step. I
-        never move money without your confirmation.
+      <div className="flex items-start gap-2">
+        <PalAvatar mood="wave" size={26} />
+        <div className="w-fit max-w-[88%] rounded-2xl rounded-tl-md bg-navy-soft px-4 py-3 text-sm text-ink">
+          Hey{name ? ` ${name}` : ""}, I&apos;m Pal. I get way too excited about long-term investing, so fair warning.
+          Want to see what your savings could be doing?
+        </div>
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 pl-[42px]">
         {SHORTCUTS.map((s, i) => (
           <motion.button
             key={s}
@@ -291,73 +314,107 @@ function Welcome({ onPick }: { onPick: (t: string) => void }) {
   );
 }
 
+/** Pal writes in short bubbles: a blank line starts a new one. */
+function splitBubbles(text: string) {
+  return text
+    .split(/\n{2,}/)
+    .map((t) => t.trim())
+    .filter(Boolean);
+}
+
 function BotTurn({
   blocks,
+  mood,
+  live,
   pending,
   interactive,
   onChoice,
   onReview,
+  onRetry,
 }: {
   blocks: Block[];
+  mood: PalMood;
+  live: boolean;
   pending: boolean;
   interactive: boolean;
   onChoice: (t: string) => void;
   onReview: (c: ReviewCard) => void;
+  onRetry: () => void;
 }) {
+  const last = blocks[blocks.length - 1];
+  // Pal is "thinking" until text starts streaming, and again while tools run.
+  const thinking = pending && (!last || last.type !== "text");
+
   return (
-    <div className="space-y-2.5">
-      {blocks.map((b, i) => (
-        <motion.div
-          key={i}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.05, ease: "easeOut" }}
-        >
-          {b.type === "text" ? (
-            <div className="w-fit max-w-[90%] rounded-2xl rounded-bl-md bg-navy-soft px-4 py-3 text-sm text-ink">
-              <RichText text={b.text} />
-            </div>
-          ) : b.type === "steps" ? (
-            <ul className="space-y-1.5 rounded-2xl bg-surface p-3 ring-1 ring-line">
-              {b.steps.map((s) => (
-                <motion.li
-                  key={s.id}
-                  initial={{ opacity: 0, x: -6 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="flex items-center gap-2 text-sm text-ink"
-                >
-                  {s.status === "running" ? (
-                    <Loader2 className="size-4 animate-spin text-muted" aria-hidden />
-                  ) : s.status === "done" ? (
-                    <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} className="grid size-4 place-items-center rounded-full bg-success text-white">
-                      <Check className="size-3" strokeWidth={3} aria-hidden />
-                    </motion.span>
-                  ) : (
-                    <span className="grid size-4 place-items-center rounded-full bg-danger text-white">
-                      <X className="size-3" strokeWidth={3} aria-hidden />
-                    </span>
-                  )}
-                  {s.label}
-                </motion.li>
-              ))}
-            </ul>
-          ) : (
-            <CardView card={b.card} interactive={interactive} onChoice={onChoice} onReview={onReview} />
-          )}
-        </motion.div>
-      ))}
-      {pending && blocks.length === 0 && (
-        <div className="flex w-fit gap-1 rounded-2xl rounded-bl-md bg-navy-soft px-4 py-3" aria-label="Finpal AI is typing">
-          {[0, 1, 2].map((i) => (
-            <motion.span
-              key={i}
-              className="size-1.5 rounded-full bg-navy/60"
-              animate={{ opacity: [0.3, 1, 0.3] }}
-              transition={{ duration: 1, repeat: Infinity, delay: i * 0.15 }}
-            />
-          ))}
-        </div>
-      )}
+    <div className="flex items-start gap-2">
+      <div className="sticky top-0 pt-0.5">
+        <PalAvatar mood={mood} size={26} animated={live} />
+      </div>
+      <div className="min-w-0 flex-1 space-y-2.5">
+        {blocks.map((b, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.05, ease: "easeOut" }}
+          >
+            {b.type === "error" ? (
+              <div role="alert" className="w-fit max-w-[95%] rounded-2xl rounded-tl-md bg-danger-soft px-4 py-3 text-sm text-danger-ink">
+                <p>{b.text}</p>
+                {interactive && (
+                  <button
+                    type="button"
+                    onClick={onRetry}
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-surface px-3 py-1.5 text-xs font-semibold text-ink ring-1 ring-line hover:bg-bg"
+                  >
+                    <RotateCcw className="size-3.5" aria-hidden />
+                    Try again
+                  </button>
+                )}
+              </div>
+            ) : b.type === "text" ? (
+              <div className="space-y-1.5">
+                {splitBubbles(b.text).map((chunk, j) => (
+                  <div key={j} className="w-fit max-w-[95%] rounded-2xl rounded-tl-md bg-navy-soft px-4 py-3 text-sm text-ink">
+                    <RichText text={chunk} />
+                  </div>
+                ))}
+              </div>
+            ) : b.type === "steps" ? (
+              <ul className="space-y-1.5 rounded-2xl bg-surface p-3 ring-1 ring-line">
+                {b.steps.map((s) => (
+                  <motion.li
+                    key={s.id}
+                    initial={{ opacity: 0, x: -6 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="flex items-center gap-2 text-sm text-ink"
+                  >
+                    {s.status === "running" ? (
+                      <Loader2 className="size-4 animate-spin text-muted" aria-hidden />
+                    ) : s.status === "done" ? (
+                      <motion.span
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        className="grid size-4 place-items-center rounded-full bg-success text-white"
+                      >
+                        <Check className="size-3" strokeWidth={3} aria-hidden />
+                      </motion.span>
+                    ) : (
+                      <span className="grid size-4 place-items-center rounded-full bg-danger text-white">
+                        <X className="size-3" strokeWidth={3} aria-hidden />
+                      </span>
+                    )}
+                    {s.label}
+                  </motion.li>
+                ))}
+              </ul>
+            ) : (
+              <CardView card={b.card} interactive={interactive} onChoice={onChoice} onReview={onReview} />
+            )}
+          </motion.div>
+        ))}
+        {thinking && <PalThinking compact />}
+      </div>
     </div>
   );
 }

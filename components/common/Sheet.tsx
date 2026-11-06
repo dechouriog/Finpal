@@ -61,14 +61,35 @@ export function Sheet({
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
-  // Move focus into the panel once, when it opens.
+  // Move focus into the panel once, when it opens; give it back to the trigger when it closes.
   useEffect(() => {
-    if (open) panelRef.current?.focus();
+    if (!open) return;
+    const trigger = document.activeElement as HTMLElement | null;
+    panelRef.current?.focus({ preventScroll: true });
+    return () => trigger?.focus?.({ preventScroll: true });
   }, [open]);
 
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onCloseRef.current();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") return onCloseRef.current();
+      // Focus trap: Tab cycles inside the open panel.
+      if (e.key !== "Tab" || !panelRef.current) return;
+      const focusable = panelRef.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
+      const active = document.activeElement;
+      if (e.shiftKey && (active === first || active === panelRef.current)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
@@ -111,8 +132,8 @@ export function Sheet({
               <div className="flex shrink-0 items-center gap-3 border-b border-line px-5 py-4">
                 {icon}
                 <div className="min-w-0 flex-1">
-                  <h2 className="truncate font-display text-lg font-extrabold text-ink">{title}</h2>
-                  {subtitle && <p className="truncate text-xs text-muted">{subtitle}</p>}
+                  <h2 className="font-display text-lg font-extrabold leading-tight text-ink">{title}</h2>
+                  {subtitle && <p className="mt-0.5 text-xs leading-snug text-muted">{subtitle}</p>}
                 </div>
                 {headerAction}
                 <button

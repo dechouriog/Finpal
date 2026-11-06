@@ -9,6 +9,6 @@ export const BRAND = {
   tealSoft: "#E6FAF7",
   navySoft: "#E8EEF9",
   ink: "#0F172A",
-  muted: "#64748B",
+  muted: "#5C6B80",
   amber: "#F59E0B",
 } as const;

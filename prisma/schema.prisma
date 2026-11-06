@@ -27,6 +27,8 @@ model User {
   occupation   String
   city         String
   avatarColor  String // hex color for the initial avatar
+  // Pal's growth stage (seed | sprout | plant | tree), driven by the user's progress; never goes back
+  palStage     String   @default("seed")
   balanceCents Int
   createdAt    DateTime @default(now())
 
