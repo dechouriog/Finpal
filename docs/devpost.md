@@ -2,6 +2,19 @@
 
 Ready-to-paste sections for the Devpost project page.
 
+## Links
+
+- **Live app:** https://finpal-r4cd.onrender.com
+- **Source code:** https://github.com/dechouriog/Finpal
+
+## Testing instructions
+
+1. Open https://finpal-r4cd.onrender.com and tap **Try the demo** (no sign-up). The first visit after a quiet period can take up to a minute while the server wakes up.
+2. Switch to **Mobile** at the top, tap **Help me start investing** and answer Pal with the quick replies.
+3. Tap **Review & confirm**, keep **Pay with PayPal** and tap **Confirm & fund**.
+4. In the PayPal Sandbox window, log in with `finpal-judges@personal.example.com` and the password `<add the sandbox password here, only on Devpost>`.
+5. Check **Invest** and **Activity**. **Profile → Reset demo data** starts over.
+
 ## Inspiration
 
 Many people keep their savings sitting in a digital wallet. Freelancers who get paid in dollars are a big part of that group: the money is safe, but it doesn't grow, and inflation slowly eats it. Most of them would like to invest, but they never start. They don't know how much they can safely put in, brokers feel intimidating, and nobody explains the risks in plain language first.

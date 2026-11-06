@@ -4,7 +4,7 @@
 
 An investing buddy inside your wallet. **Pal** turns idle savings into a first, well-understood investment, funded with **PayPal**.
 
-**Built for the PayPal AI Hackathon 2026**
+**Built for the PayPal AI Hackathon 2026** · **[Try the live app](https://finpal-r4cd.onrender.com)**
 
 ![CI](https://github.com/dechouriog/Finpal/actions/workflows/ci.yml/badge.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-000000)
@@ -187,7 +187,7 @@ Use the **Desktop | Mobile** toggle at the top, or open `http://localhost:3000/?
 
 ## Testing for judges
 
-**Live app:** `https://YOUR-APP.onrender.com` (no sign-up)
+**Live app:** [finpal-r4cd.onrender.com](https://finpal-r4cd.onrender.com) (no sign-up; the first visit after a quiet period can take up to a minute while the free instance wakes up)
 
 1. Open the app and tap **Try the demo**. You get your own private copy of Laura's account: $3,200, 12 months of history and two contacts, Maria and Sam.
 2. Switch to **Mobile** at the top for the intended experience.
