@@ -55,14 +55,23 @@ export function Sheet({
 }: SheetProps) {
   const wide = useWideApp();
   const panelRef = useRef<HTMLDivElement>(null);
+  // Keep the latest onClose without re-running effects: callers often pass an
+  // inline arrow, and re-running the focus effect on every render would steal
+  // focus from inputs inside the sheet (e.g. typing in the chat).
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  // Move focus into the panel once, when it opens.
+  useEffect(() => {
+    if (open) panelRef.current?.focus();
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onCloseRef.current();
     window.addEventListener("keydown", onKey);
-    panelRef.current?.focus();
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [open]);
 
   return (
     <AppPortal>
