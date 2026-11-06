@@ -1,15 +1,14 @@
 import { Briefcase, Cake, Mail, MapPin, type LucideIcon } from "lucide-react";
 import { FinpalLogo } from "@/components/brand/FinpalLogo";
 import { Avatar } from "@/components/common/Avatar";
-import { DemoUserSwitcher } from "@/components/profile/DemoUserSwitcher";
+import { LogOutButton } from "@/components/profile/LogOutButton";
 import { ResetDemoButton } from "@/components/profile/ResetDemoButton";
 import { DISCLAIMER } from "@/lib/brand";
-import { listDemoUsers } from "@/lib/queries";
 import { getCurrentUser } from "@/lib/session";
 import { formatCents } from "@/lib/utils";
 
 export default async function ProfilePage() {
-  const [user, users] = await Promise.all([getCurrentUser(), listDemoUsers()]);
+  const user = await getCurrentUser();
 
   const details: { icon: LucideIcon; label: string; value: string }[] = [
     { icon: Mail, label: "Email", value: user.email },
@@ -50,13 +49,16 @@ export default async function ProfilePage() {
         <section aria-labelledby="demo-heading" className="space-y-4 rounded-2xl bg-surface p-5 ring-1 ring-line">
           <div>
             <h2 id="demo-heading" className="font-display text-base font-bold">
-              Demo user
+              Your demo
             </h2>
-            <p className="mt-1 text-sm text-muted">Switch accounts to try sending and requesting money.</p>
+            <p className="mt-1 text-sm text-muted">
+              This is your private demo account. Maria and Sam are your contacts for sending and requesting money.
+              Reset to start Laura&apos;s story again.
+            </p>
           </div>
-          <DemoUserSwitcher users={users} currentId={user.id} />
+          <ResetDemoButton />
           <div className="border-t border-line pt-4">
-            <ResetDemoButton />
+            <LogOutButton />
           </div>
         </section>
       </div>

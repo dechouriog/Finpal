@@ -21,6 +21,7 @@ export default async function ActivityPage() {
     createdAt: t.createdAt.toISOString(),
     externalRef: t.externalRef,
     shares: t.shares,
+    isSeed: t.isSeed,
   }));
 
   return (

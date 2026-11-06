@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /** Enum-like domain values. Stored as strings in the DB, validated with zod. */
-export const TX_TYPES = ["DEPOSIT", "WITHDRAW", "SEND", "RECEIVE", "BUY", "SELL", "AUTO_INVEST"] as const;
+export const TX_TYPES = ["DEPOSIT", "WITHDRAW", "SEND", "RECEIVE", "BUY", "SELL", "AUTO_INVEST", "REFUND"] as const;
 export const TxType = z.enum(TX_TYPES);
 export type TxType = z.infer<typeof TxType>;
 
@@ -27,9 +27,8 @@ export const TX_TYPE_LABEL: Record<TxType, string> = {
   BUY: "Buy",
   SELL: "Sell",
   AUTO_INVEST: "Auto-invest",
+  REFUND: "Refund",
 };
 
-export const DEMO_USER_IDS = ["laura", "maria", "sam"] as const;
-export const DemoUserId = z.enum(DEMO_USER_IDS);
-export type DemoUserId = z.infer<typeof DemoUserId>;
-export const DEFAULT_USER_ID: DemoUserId = "laura";
+/** User ids are opaque strings; authorization always checks them server-side. */
+export const UserId = z.string().trim().min(1).max(80);

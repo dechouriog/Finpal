@@ -92,12 +92,17 @@ export const DEMO_ASSETS: Prisma.AssetCreateManyInput[] = [
   },
 ];
 
-export const DEMO_USERS: Prisma.UserCreateManyInput[] = [
-  {
-    id: "laura",
+type Persona = Omit<Prisma.UserCreateManyInput, "id" | "spaceId" | "isDemo" | "email" | "handle"> & {
+  emailLocal: string;
+  handle: string;
+};
+
+/** The three people in every space. Laura is the main user; Maria and Sam are her contacts. */
+const PERSONAS: Record<"laura" | "maria" | "sam", Persona> = {
+  laura: {
     name: "Laura",
     fullName: "Laura Mendez",
-    email: "laura@finpal.demo",
+    emailLocal: "laura",
     handle: "@laura.designs",
     age: 29,
     occupation: "Freelance designer",
@@ -105,11 +110,10 @@ export const DEMO_USERS: Prisma.UserCreateManyInput[] = [
     avatarColor: "#0B3D91",
     balanceCents: 3_200_00,
   },
-  {
-    id: "maria",
+  maria: {
     name: "Maria",
     fullName: "Maria Torres",
-    email: "maria@finpal.demo",
+    emailLocal: "maria",
     handle: "@maria.t",
     age: 34,
     occupation: "Product manager",
@@ -117,11 +121,10 @@ export const DEMO_USERS: Prisma.UserCreateManyInput[] = [
     avatarColor: "#00806F",
     balanceCents: 1_540_00,
   },
-  {
-    id: "sam",
+  sam: {
     name: "Sam",
     fullName: "Sam Rivera",
-    email: "sam@finpal.demo",
+    emailLocal: "sam",
     handle: "@samr",
     age: 26,
     occupation: "Software developer",
@@ -129,7 +132,11 @@ export const DEMO_USERS: Prisma.UserCreateManyInput[] = [
     avatarColor: "#B45309",
     balanceCents: 860_25,
   },
-];
+};
+
+/** The reserved space used to record the pitch video (reachable only via the secret URL). */
+export const RESERVED_SPACE = { laura: "laura", maria: "maria", sam: "sam" } as const;
+export const RESERVED_EMAIL = "laura@finpal.demo";
 
 // ---------- Laura's history ----------
 
@@ -239,48 +246,107 @@ function otherHistory(now: Date): { maria: TxSeed[]; sam: TxSeed[] } {
   };
 }
 
-const DEMO_POSITIONS: Prisma.PositionCreateManyInput[] = [
-  { userId: "maria", assetId: "total-market-index", shares: 4.2 },
-  { userId: "maria", assetId: "short-term-bond", shares: 6 },
-];
+// ---------- spaces ----------
+
+export type SpaceIds = { laura: string; maria: string; sam: string };
+
+function personaUser(
+  key: keyof SpaceIds,
+  ids: SpaceIds,
+  isDemo: boolean,
+): Prisma.UserCreateManyInput {
+  const { emailLocal, handle, ...rest } = PERSONAS[key];
+  const reserved = ids.laura === RESERVED_SPACE.laura;
+  // Reserved users keep clean emails/handles; demo clones get a unique suffix.
+  const suffix = reserved ? "" : `.${ids.laura.slice(-8)}`;
+  return {
+    ...rest,
+    id: ids[key],
+    spaceId: ids.laura,
+    isDemo,
+    email: reserved ? `${emailLocal}@finpal.demo` : `${emailLocal}+${ids.laura}@demo.finpal.app`,
+    handle: `${handle}${suffix}`,
+  };
+}
+
+/**
+ * Create a full space: Laura (main user) plus her contacts Maria and Sam, with
+ * 12 months of seeded history. Must run inside a transaction.
+ */
+export async function createSpace(tx: Prisma.TransactionClient, ids: SpaceIds, opts: { isDemo: boolean; now?: Date }) {
+  const now = opts.now ?? new Date();
+  const laura = lauraHistory(now);
+  const { maria, sam } = otherHistory(now);
+  const rows = (userId: string, list: TxSeed[]) => list.map((r) => ({ ...r, userId, isSeed: true }));
+
+  await tx.user.createMany({
+    data: [personaUser("laura", ids, opts.isDemo), personaUser("maria", ids, opts.isDemo), personaUser("sam", ids, opts.isDemo)],
+  });
+  await tx.transaction.createMany({
+    data: [...rows(ids.laura, laura), ...rows(ids.maria, maria), ...rows(ids.sam, sam)],
+  });
+  await tx.position.createMany({
+    data: [
+      { userId: ids.maria, assetId: "total-market-index", shares: 4.2 },
+      { userId: ids.maria, assetId: "short-term-bond", shares: 6 },
+    ],
+  });
+  // One open request so the Payments screen has something to act on.
+  await tx.moneyRequest.create({
+    data: {
+      requesterId: ids.sam,
+      payerId: ids.laura,
+      amountCents: 18_50,
+      note: "Pizza night",
+      createdAt: new Date(now.getTime() - 26 * 60 * 60 * 1000),
+    },
+  });
+  return { transactions: laura.length + maria.length + sam.length };
+}
+
+/** Delete every user of a space (cascades to their transactions, positions, plans and requests). */
+export async function deleteSpace(tx: Prisma.TransactionClient, spaceId: string) {
+  const users = await tx.user.findMany({ where: { spaceId }, select: { id: true } });
+  const ids = users.map((u) => u.id);
+  if (ids.length === 0) return 0;
+  await tx.moneyRequest.deleteMany({ where: { OR: [{ requesterId: { in: ids } }, { payerId: { in: ids } }] } });
+  await tx.user.deleteMany({ where: { id: { in: ids } } });
+  return ids.length;
+}
+
+/**
+ * Restore a space to its initial state, keeping the main user's id so the
+ * signed-in session stays valid. Contacts get fresh ids.
+ */
+export async function resetSpace(tx: Prisma.TransactionClient, mainUserId: string, isDemo: boolean, now = new Date()) {
+  await deleteSpace(tx, mainUserId);
+  const reserved = mainUserId === RESERVED_SPACE.laura;
+  const ids: SpaceIds = reserved
+    ? { ...RESERVED_SPACE }
+    : { laura: mainUserId, maria: `${mainUserId}-maria`, sam: `${mainUserId}-sam` };
+  return createSpace(tx, ids, { isDemo, now });
+}
+
+/** Ids for a brand-new demo space. */
+export function newDemoSpaceIds(): SpaceIds {
+  const id = `demo_${crypto.randomUUID().replace(/-/g, "")}`;
+  return { laura: id, maria: `${id}-maria`, sam: `${id}-sam` };
+}
 
 // ---------- entry point ----------
 
-/** Wipes all demo data and recreates it. Runs inside a single DB transaction. */
-export async function seedDemo(prisma: PrismaClient, now = new Date()) {
-  const laura = lauraHistory(now);
-  const { maria, sam } = otherHistory(now);
-  const withUser = (userId: string, rows: TxSeed[]) => rows.map((r) => ({ ...r, userId }));
-
-  await prisma.$transaction(
+/**
+ * Base seed (idempotent, safe to re-run): upserts the asset catalog and resets
+ * ONLY the reserved recording space. Demo users created by "Try the demo" are untouched.
+ */
+export async function seedBase(prisma: PrismaClient, now = new Date()) {
+  return prisma.$transaction(
     async (tx) => {
-      await tx.moneyRequest.deleteMany();
-      await tx.transaction.deleteMany();
-      await tx.position.deleteMany();
-      await tx.riskProfile.deleteMany();
-      await tx.autoInvestEvent.deleteMany();
-      await tx.user.deleteMany();
-      await tx.asset.deleteMany();
-
-      await tx.asset.createMany({ data: DEMO_ASSETS });
-      await tx.user.createMany({ data: DEMO_USERS });
-      await tx.transaction.createMany({
-        data: [...withUser("laura", laura), ...withUser("maria", maria), ...withUser("sam", sam)],
-      });
-      await tx.position.createMany({ data: DEMO_POSITIONS });
-      // One open request so the Payments screen has something to act on.
-      await tx.moneyRequest.create({
-        data: {
-          requesterId: "sam",
-          payerId: "laura",
-          amountCents: 18_50,
-          note: "Pizza night",
-          createdAt: new Date(now.getTime() - 26 * 60 * 60 * 1000),
-        },
-      });
+      for (const asset of DEMO_ASSETS) {
+        await tx.asset.upsert({ where: { id: asset.id }, create: asset, update: asset });
+      }
+      return resetSpace(tx, RESERVED_SPACE.laura, false, now);
     },
     { timeout: 30_000 },
   );
-
-  return { transactions: laura.length + maria.length + sam.length };
 }

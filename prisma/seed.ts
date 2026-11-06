@@ -1,11 +1,11 @@
 import { PrismaClient } from "@prisma/client";
-import { seedDemo } from "../lib/demo/seed";
+import { seedBase } from "../lib/demo/seed";
 
 const prisma = new PrismaClient();
 
-seedDemo(prisma)
+seedBase(prisma)
   .then(({ transactions }) => {
-    console.log(`Seeded Finpal demo data: 3 users, 8 assets, ${transactions} transactions.`);
+    console.log(`Seeded Finpal base data: 8 assets and the reserved Laura space (${transactions} transactions).`);
   })
   .catch((err) => {
     console.error(err);

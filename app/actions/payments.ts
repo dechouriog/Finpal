@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { InsufficientFundsError, transferWithinTx } from "@/lib/payments";
+import { InsufficientFundsError, UnknownContactError, transferWithinTx } from "@/lib/payments";
 import { getCurrentUserId } from "@/lib/session";
 import { RequestId, RequestMoneyInput, SendMoneyInput } from "@/lib/validation";
 import type { ActionResult } from "./demo";
@@ -12,7 +12,7 @@ function firstIssue(error: { issues: { message: string }[] }) {
 }
 
 function failure(err: unknown, fallback: string): ActionResult {
-  if (err instanceof InsufficientFundsError) return { ok: false, error: err.message };
+  if (err instanceof InsufficientFundsError || err instanceof UnknownContactError) return { ok: false, error: err.message };
   if (err instanceof Error && err.message.startsWith("You can't")) return { ok: false, error: err.message };
   console.error(fallback, err);
   return { ok: false, error: fallback };
@@ -45,6 +45,11 @@ export async function requestMoney(input: RequestMoneyInput): Promise<ActionResu
   const requesterId = await getCurrentUserId();
   const { fromUserId, amountCents, note } = parsed.data;
   if (fromUserId === requesterId) return { ok: false, error: "You can't request money from yourself." };
+  const [me, payer] = await Promise.all([
+    prisma.user.findUnique({ where: { id: requesterId }, select: { spaceId: true } }),
+    prisma.user.findUnique({ where: { id: fromUserId }, select: { spaceId: true } }),
+  ]);
+  if (!me || !payer || payer.spaceId !== me.spaceId) return { ok: false, error: new UnknownContactError().message };
 
   await prisma.moneyRequest.create({ data: { requesterId, payerId: fromUserId, amountCents, note } });
   refresh();

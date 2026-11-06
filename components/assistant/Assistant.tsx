@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, Loader2, RotateCcw, SendHorizontal, X } from "lucide-react";
+import { Check, Loader2, RotateCcw, SendHorizontal, Square, X } from "lucide-react";
 import { SparkleIcon } from "@/components/brand/SparkleIcon";
 import { Sheet } from "@/components/common/Sheet";
 import { OPEN_ASSISTANT_EVENT } from "@/components/home/AskAiBanner";
@@ -115,7 +115,8 @@ export function Assistant() {
         }
       }
     } catch (err) {
-      if ((err as Error).name !== "AbortError") update({ t: "error", message: "I couldn't reach Finpal AI. Please try again." });
+      if ((err as Error).name === "AbortError") update({ t: "text", d: "\n\n(Stopped)" });
+      else update({ t: "error", message: "I couldn't reach Finpal AI. Please try again." });
     } finally {
       // Keep the user's message in history even if the reply failed, so context isn't lost.
       if (!gotHistory) setHistory(outgoing);
@@ -232,14 +233,26 @@ export function Assistant() {
               maxLength={2000}
               className="h-11 min-w-0 flex-1 rounded-full bg-bg px-4 text-sm text-ink ring-1 ring-line placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-teal"
             />
-            <button
-              type="submit"
-              disabled={busy || !input.trim()}
-              aria-label="Send"
-              className="grid size-11 shrink-0 place-items-center rounded-full bg-teal text-deep transition-opacity disabled:opacity-40"
-            >
-              {busy ? <Loader2 className="size-5 animate-spin" aria-hidden /> : <SendHorizontal className="size-5" aria-hidden />}
-            </button>
+            {busy ? (
+              <button
+                type="button"
+                onClick={() => abortRef.current?.abort()}
+                aria-label="Stop response"
+                title="Stop"
+                className="grid size-11 shrink-0 place-items-center rounded-full bg-navy text-white"
+              >
+                <Square className="size-4 fill-current" aria-hidden />
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={!input.trim()}
+                aria-label="Send"
+                className="grid size-11 shrink-0 place-items-center rounded-full bg-teal text-deep transition-opacity disabled:opacity-40"
+              >
+                <SendHorizontal className="size-5" aria-hidden />
+              </button>
+            )}
           </form>
 
           <AnimatePresence>{review && <ReviewScreen key="review" card={review} onClose={() => setReview(null)} />}</AnimatePresence>

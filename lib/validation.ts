@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DemoUserId } from "@/lib/domain";
+import { UserId } from "@/lib/domain";
 import { MAX_TRANSFER_CENTS } from "@/lib/money";
 
 export const AmountCents = z
@@ -16,14 +16,14 @@ const Note = z
   .transform((v) => (v ? v : undefined));
 
 export const SendMoneyInput = z.object({
-  toUserId: DemoUserId,
+  toUserId: UserId,
   amountCents: AmountCents,
   note: Note,
 });
 export type SendMoneyInput = z.input<typeof SendMoneyInput>;
 
 export const RequestMoneyInput = z.object({
-  fromUserId: DemoUserId,
+  fromUserId: UserId,
   amountCents: AmountCents,
   note: Note,
 });

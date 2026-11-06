@@ -15,7 +15,7 @@ import { cn, formatCents } from "@/lib/utils";
 import { AmountCents } from "@/lib/validation";
 
 export type Contact = {
-  id: "laura" | "maria" | "sam";
+  id: string;
   name: string;
   fullName: string;
   handle: string;

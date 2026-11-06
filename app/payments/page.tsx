@@ -1,7 +1,6 @@
 import { PaymentFlow, type Contact } from "@/components/payments/PaymentFlow";
 import { RequestsPanel, type RequestItem } from "@/components/payments/RequestsPanel";
 import { prisma } from "@/lib/db";
-import { DemoUserId } from "@/lib/domain";
 import { getCurrentUser } from "@/lib/session";
 
 const personSelect = { name: true, fullName: true, avatarColor: true } as const;
@@ -12,7 +11,8 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
 
   const [others, incoming, outgoing] = await Promise.all([
     prisma.user.findMany({
-      where: { id: { not: user.id } },
+      // Isolation: only users in the signed-in user's own space.
+      where: { spaceId: user.spaceId, id: { not: user.id } },
       orderBy: { createdAt: "asc" },
       select: { id: true, name: true, fullName: true, handle: true, avatarColor: true },
     }),
@@ -28,10 +28,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
     }),
   ]);
 
-  const contacts: Contact[] = others.flatMap((u) => {
-    const id = DemoUserId.safeParse(u.id);
-    return id.success ? [{ ...u, id: id.data }] : [];
-  });
+  const contacts: Contact[] = others;
 
   const toItem = (
     r: { id: string; amountCents: number; note: string | null; createdAt: Date },

@@ -17,10 +17,3 @@ export async function getPortfolioSummary(userId: string) {
   });
   return { valueCents: portfolioValueCents(positions), positionCount: positions.length };
 }
-
-export async function listDemoUsers() {
-  return prisma.user.findMany({
-    orderBy: { createdAt: "asc" },
-    select: { id: true, name: true, fullName: true, occupation: true, avatarColor: true, balanceCents: true },
-  });
-}

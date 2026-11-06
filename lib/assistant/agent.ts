@@ -5,6 +5,7 @@ import type {
   ChatCompletionMessageFunctionToolCall,
 } from "openai/resources/chat/completions";
 import type { AssistantEvent } from "./cards";
+import { runFallback } from "./fallback";
 import { TOOLS, TOOL_DEFINITIONS, type ToolContext } from "./tools";
 
 const MAX_ROUNDS = 8;
@@ -16,8 +17,9 @@ function llm() {
   client ??= new OpenAI({
     apiKey,
     baseURL: "https://openrouter.ai/api/v1",
-    // Keep the demo responsive: fail fast with a friendly message instead of hanging.
-    timeout: 30_000,
+    // Keep the demo responsive: each attempt times out after 20 s, and 429/5xx
+    // responses are retried once with exponential backoff (built into the SDK).
+    timeout: 20_000,
     maxRetries: 1,
     defaultHeaders: { "HTTP-Referer": "https://github.com/dechouriog/Finpal", "X-Title": "Finpal" },
   });
@@ -84,37 +86,63 @@ export async function runAgent(
   const added: ChatCompletionMessageParam[] = [];
   const messages = (): ChatCompletionMessageParam[] => [{ role: "system", content: ctx.system }, ...history, ...added];
 
-  for (let round = 0; round < MAX_ROUNDS; round++) {
-    const stream = await llm().chat.completions.create(
-      {
-        model: model(),
-        messages: messages(),
-        tools: TOOL_DEFINITIONS,
-        tool_choice: "auto",
-        parallel_tool_calls: true,
-        stream: true,
-        temperature: 0.3,
-        max_tokens: 700,
-      },
-      { signal },
-    );
+  // AI_FORCE_FALLBACK=1 skips the model entirely (demo safety switch and tests).
+  if (process.env.AI_FORCE_FALLBACK === "1") {
+    const fb = await runFallback(history, ctx, emit);
+    if (fb) return fb;
+    throw new Error("The assistant is offline and this request needs the AI model.");
+  }
 
+  for (let round = 0; round < MAX_ROUNDS; round++) {
     let text = "";
     const calls = new Map<number, PendingCall>();
-    for await (const chunk of stream) {
-      const delta = chunk.choices[0]?.delta;
-      if (!delta) continue;
-      if (delta.content) {
-        text += delta.content;
-        emit({ t: "text", d: delta.content });
+    try {
+      // Hard cap per round so a stalled stream can never hang the chat.
+      const roundSignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(45_000)]) : AbortSignal.timeout(45_000);
+      const stream = await llm().chat.completions.create(
+        {
+          model: model(),
+          messages: messages(),
+          tools: TOOL_DEFINITIONS,
+          tool_choice: "auto",
+          parallel_tool_calls: true,
+          stream: true,
+          temperature: 0.3,
+          max_tokens: 700,
+        },
+        { signal: roundSignal },
+      );
+
+      for await (const chunk of stream) {
+        const delta = chunk.choices[0]?.delta;
+        if (!delta) continue;
+        if (delta.content) {
+          text += delta.content;
+          emit({ t: "text", d: delta.content });
+        }
+        for (const tc of delta.tool_calls ?? []) {
+          const cur = calls.get(tc.index) ?? { id: "", name: "", args: "" };
+          if (tc.id) cur.id = tc.id;
+          if (tc.function?.name) cur.name += tc.function.name;
+          if (tc.function?.arguments) cur.args += tc.function.arguments;
+          calls.set(tc.index, cur);
+        }
       }
-      for (const tc of delta.tool_calls ?? []) {
-        const cur = calls.get(tc.index) ?? { id: "", name: "", args: "" };
-        if (tc.id) cur.id = tc.id;
-        if (tc.function?.name) cur.name += tc.function.name;
-        if (tc.function?.arguments) cur.args += tc.function.arguments;
-        calls.set(tc.index, cur);
+    } catch (err) {
+      if (signal?.aborted) throw err; // the user pressed Stop
+      console.warn(
+        "Finpal AI model call failed; using the deterministic fallback.",
+        err instanceof Error ? err.message : err,
+      );
+      // Only fall back from a clean state (no half-written text in this round).
+      if (!text && calls.size === 0) {
+        const fb = await runFallback([...history, ...added], ctx, emit);
+        if (fb) {
+          added.push(...fb);
+          return added;
+        }
       }
+      throw err;
     }
 
     const toolCalls: ChatCompletionMessageFunctionToolCall[] = [...calls.values()].map((c, i) => ({

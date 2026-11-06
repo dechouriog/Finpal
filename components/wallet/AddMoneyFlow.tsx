@@ -22,6 +22,8 @@ export function AddMoneyFlow({ balanceCents }: { balanceCents: number }) {
   const [custom, setCustom] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
+  // Non-error outcomes: cancelled, declined (retry), pending.
+  const [notice, setNotice] = useState<string | null>(null);
   const [result, setResult] = useState<CaptureResult | null>(null);
   const customId = useId();
 
@@ -127,6 +129,12 @@ export function AddMoneyFlow({ balanceCents }: { balanceCents: number }) {
               <p className="mt-1 text-xs text-muted">Pay with PayPal. You&apos;ll log in on PayPal&apos;s sandbox, never on Finpal.</p>
             </div>
 
+            {notice && !error && (
+              <p role="status" className="rounded-xl bg-navy-soft p-3 text-sm text-navy">
+                {notice}
+              </p>
+            )}
+
             {error && (
               <p role="alert" className="rounded-xl bg-danger/10 p-3 text-sm text-danger">
                 {error}
@@ -138,6 +146,7 @@ export function AddMoneyFlow({ balanceCents }: { balanceCents: number }) {
               disabled={!amountCheck.success || status === "processing"}
               onProcessing={() => {
                 setError(null);
+                setNotice(null);
                 setStatus("processing");
               }}
               onSuccess={onSuccess}
@@ -145,7 +154,21 @@ export function AddMoneyFlow({ balanceCents }: { balanceCents: number }) {
                 setError(m);
                 setStatus("idle");
               }}
-              onCancel={() => setStatus("idle")}
+              onCancel={() => {
+                setStatus("idle");
+                setError(null);
+                setNotice("Payment cancelled. No money was moved.");
+              }}
+              onDeclined={() => {
+                setStatus("idle");
+                setError(null);
+                setNotice("PayPal declined that payment method. Choose another one in the PayPal window.");
+              }}
+              onPending={(m) => {
+                setStatus("idle");
+                setError(null);
+                setNotice(m);
+              }}
             />
           </motion.div>
         )}
@@ -163,7 +186,7 @@ export function AddMoneyFlow({ balanceCents }: { balanceCents: number }) {
             <div className="flex flex-col items-center gap-3 text-center">
               <Loader2 className="size-8 animate-spin text-teal" aria-hidden />
               <p className="font-display text-lg font-bold text-ink">Funding with PayPal…</p>
-              <p className="text-sm text-muted">Confirming your payment with PayPal.</p>
+              <p className="text-sm text-muted">Payment approved. Confirming it with PayPal.</p>
             </div>
           </motion.div>
         )}

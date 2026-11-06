@@ -63,11 +63,27 @@ const AutoInvestArgs = z.object({
 });
 
 const ReviewArgs = z.object({
-  amount_cents: z.number().int().min(100).max(1_000_000),
-  risk_level: RiskLevel,
+  amount_cents: z.number().int().min(100).max(1_000_000).optional(),
+  risk_level: RiskLevel.optional(),
   auto_invest_amount_cents: z.number().int().min(100).max(1_000_000).nullable().optional(),
   auto_invest_days: z.array(z.number().int().min(1).max(31)).max(4).nullable().optional(),
 });
+
+/**
+ * Amounts and risk level for a portfolio ALWAYS come from server data, never from
+ * the model's arguments: the saved risk profile and the cash-flow analysis win.
+ * The model's values are only a fallback when no server data exists.
+ */
+export async function resolvePlan(ctx: ToolContext, modelAmountCents: number | undefined, modelLevel: RiskLevel | undefined) {
+  const [profile, cashflow] = await Promise.all([
+    prisma.riskProfile.findUnique({ where: { userId: ctx.userId } }),
+    summarizeCashflow(ctx.userId, 12, ctx.now),
+  ]);
+  const level = RiskLevel.catch(modelLevel ?? "MODERATE").parse(profile?.level ?? modelLevel);
+  const amountCents = cashflow.readyToInvestCents > 0 ? cashflow.readyToInvestCents : (modelAmountCents ?? 0);
+  const horizon = profile ? HORIZON_LABEL[RiskAnswers.shape.horizon.catch("long").parse(profile.horizon)] : null;
+  return { level, amountCents, horizon, balanceCents: cashflow.balanceCents };
+}
 
 export const TOOLS: Record<string, ToolSpec> = {
   get_balance: {
@@ -244,12 +260,15 @@ export const TOOLS: Record<string, ToolSpec> = {
       required: ["risk_level", "amount_cents"],
     }),
     run: async (args, { userId }) => {
-      const { risk_level, amount_cents } = z
-        .object({ risk_level: RiskLevel, amount_cents: z.number().int().min(100).max(1_000_000) })
-        .parse(args);
+      const a = z
+        .object({ risk_level: RiskLevel.optional(), amount_cents: z.number().int().min(100).max(1_000_000).optional() })
+        .parse(args ?? {});
+      const plan = await resolvePlan({ userId, now: new Date() }, a.amount_cents, a.risk_level);
+      if (plan.amountCents < 100) return { result: { error: "Nothing is ready to invest after the emergency fund." } };
+      const risk_level = plan.level;
+      const amount_cents = plan.amountCents;
       const lines = buildAllocation(risk_level, amount_cents);
-      const profile = await prisma.riskProfile.findUnique({ where: { userId } });
-      const horizon = profile ? HORIZON_LABEL[RiskAnswers.shape.horizon.catch("long").parse(profile.horizon)] : null;
+      const horizon = plan.horizon;
       return {
         cards: [
           {
@@ -335,23 +354,24 @@ export const TOOLS: Record<string, ToolSpec> = {
     ),
     run: async (args, ctx) => {
       const a = ReviewArgs.parse(args);
-      const user = await prisma.user.findUniqueOrThrow({ where: { id: ctx.userId }, select: { balanceCents: true } });
-      const shortfall = Math.max(0, a.amount_cents - user.balanceCents);
+      const plan = await resolvePlan(ctx, a.amount_cents, a.risk_level);
+      if (plan.amountCents < 100) return { result: { error: "Nothing is ready to invest after the emergency fund." } };
+      const user = { balanceCents: plan.balanceCents };
+      const shortfall = Math.max(0, plan.amountCents - user.balanceCents);
       let depositOrderId: string | null = null;
       if (shortfall > 0) {
         depositOrderId = await createDepositOrderViaAgentToolkit(shortfall);
         await startDeposit(ctx.userId, shortfall, depositOrderId);
       }
-      const profile = await prisma.riskProfile.findUnique({ where: { userId: ctx.userId } });
-      const horizon = profile ? HORIZON_LABEL[RiskAnswers.shape.horizon.catch("long").parse(profile.horizon)] : null;
+      const horizon = plan.horizon;
       const days = a.auto_invest_days?.length ? a.auto_invest_days : null;
       const card: ReviewCard = {
         kind: "review",
-        amountCents: a.amount_cents,
-        level: a.risk_level,
-        levelLabel: RISK_LABEL[a.risk_level],
-        chip: [RISK_LABEL[a.risk_level], horizon].filter(Boolean).join(" · "),
-        lines: buildAllocation(a.risk_level, a.amount_cents),
+        amountCents: plan.amountCents,
+        level: plan.level,
+        levelLabel: RISK_LABEL[plan.level],
+        chip: [RISK_LABEL[plan.level], horizon].filter(Boolean).join(" · "),
+        lines: buildAllocation(plan.level, plan.amountCents),
         balanceCents: user.balanceCents,
         shortfallCents: shortfall,
         depositOrderId,

@@ -202,7 +202,18 @@ export function ReviewScreen({ card, onClose }: { card: ReviewCard; onClose: () 
                     setError(m);
                     setPhase("paypal");
                   }}
-                  onCancel={() => setPhase("review")}
+                  onCancel={() => {
+                    setPhase("review");
+                    setError("Payment cancelled. Nothing was invested and no money was moved.");
+                  }}
+                  onDeclined={() => {
+                    setPhase("paypal");
+                    setError("PayPal declined that payment method. Choose another one in the PayPal window.");
+                  }}
+                  onPending={(m) => {
+                    setPhase("review");
+                    setError(`${m} You can invest once it shows in your balance.`);
+                  }}
                 />
               </div>
             ) : (

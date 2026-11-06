@@ -13,6 +13,8 @@ export type ActivityRow = {
   createdAt: string; // ISO
   externalRef: string | null;
   shares: number | null;
+  /** Seeded history, labeled "Demo data". */
+  isSeed: boolean;
 };
 
 export const TYPE_BADGE: Record<TxType, string> = {
@@ -23,6 +25,7 @@ export const TYPE_BADGE: Record<TxType, string> = {
   BUY: "bg-[#FEF3C7] text-[#92400E]",
   SELL: "bg-[#FEF3C7] text-[#92400E]",
   AUTO_INVEST: "bg-teal-soft text-teal-ink",
+  REFUND: "bg-[#FEE2E2] text-[#991B1B]",
 };
 
 export const STATUS_BADGE: Record<TxStatus, string> = {

@@ -2,8 +2,10 @@ import type { ChatCompletionMessageParam } from "openai/resources/chat/completio
 import { z } from "zod";
 import { jsonError } from "@/lib/api";
 import { runAgent, systemPrompt } from "@/lib/assistant/agent";
+import { consumeAiMessage, dailyLimit } from "@/lib/assistant/usage";
 import type { AssistantEvent } from "@/lib/assistant/cards";
-import { getCurrentUser } from "@/lib/session";
+import { prisma } from "@/lib/db";
+import { getSessionUserId } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -31,9 +33,22 @@ export async function POST(req: Request) {
   const last = parsed.data.messages.at(-1);
   if (last?.role !== "user") return jsonError("The last message must come from the user.");
 
-  const user = await getCurrentUser();
+  const userId = await getSessionUserId();
+  if (!userId) return jsonError("Please start the demo first.", 401);
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) return jsonError("Your demo session has expired. Start a new demo.", 401);
   const now = new Date();
   const encoder = new TextEncoder();
+
+  if (!(await consumeAiMessage(user.id, now))) {
+    const body = [
+      { t: "text", d: `You've reached today's limit of ${dailyLimit()} Finpal AI messages. Everything else in the app keeps working, and the assistant will be back tomorrow.` },
+      { t: "done" },
+    ] satisfies AssistantEvent[];
+    return new Response(body.map((e) => `${JSON.stringify(e)}\n`).join(""), {
+      headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store" },
+    });
+  }
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {

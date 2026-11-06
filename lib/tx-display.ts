@@ -12,6 +12,7 @@ import {
   Smartphone,
   TrendingDown,
   TrendingUp,
+  Undo2,
   UtensilsCrossed,
   Wifi,
   Zap,
@@ -39,6 +40,7 @@ const TYPE_ICON: Record<string, LucideIcon> = {
   BUY: TrendingUp,
   SELL: TrendingDown,
   AUTO_INVEST: CalendarClock,
+  REFUND: Undo2,
 };
 
 type TxLike = Pick<Transaction, "type" | "category" | "counterparty">;

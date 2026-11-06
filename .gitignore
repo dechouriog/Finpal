@@ -22,3 +22,5 @@ prisma/*.db-journal
 
 # pitch video (large binary, keep out of the repo)
 *.mp4
+prisma/test.db
+prisma/test.db-journal

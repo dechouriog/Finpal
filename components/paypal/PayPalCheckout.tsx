@@ -13,11 +13,26 @@ type Props = {
   /** Use an order that was already created on the server (e.g. by the assistant). */
   orderId?: string;
   disabled?: boolean;
+  /** The buyer approved in the popup; Finpal is now capturing. */
   onProcessing?: () => void;
   onSuccess: (result: CaptureResult) => void;
   onError: (message: string) => void;
+  /** The buyer closed the popup or cancelled. */
   onCancel?: () => void;
+  /** PayPal declined the funding source; the popup reopens so the buyer can pick another. */
+  onDeclined?: (message: string) => void;
+  /** PayPal accepted but is still processing; the webhook will finish the deposit. */
+  onPending?: (message: string) => void;
 };
+
+class CheckoutError extends Error {
+  constructor(
+    message: string,
+    readonly code: string | null,
+  ) {
+    super(message);
+  }
+}
 
 async function postJson<T>(url: string, body?: unknown): Promise<T> {
   const res = await fetch(url, {
@@ -25,11 +40,12 @@ async function postJson<T>(url: string, body?: unknown): Promise<T> {
     headers: { "Content-Type": "application/json" },
     body: body ? JSON.stringify(body) : undefined,
   });
-  const json = (await res.json().catch(() => ({ ok: false, error: "Unexpected response." }))) as T & {
+  const json = (await res.json().catch(() => ({ ok: false, error: "Unexpected response from Finpal." }))) as T & {
     ok: boolean;
     error?: string;
+    code?: string;
   };
-  if (!res.ok || !json.ok) throw new Error(json.error ?? "Something went wrong.");
+  if (!res.ok || !json.ok) throw new CheckoutError(json.error ?? "Something went wrong.", json.code ?? null);
   return json;
 }
 
@@ -52,7 +68,7 @@ export function PayPalCheckout(props: Props) {
   );
 }
 
-function Buttons({ amountCents, orderId, disabled, onProcessing, onSuccess, onError, onCancel }: Props) {
+function Buttons({ amountCents, orderId, disabled, onProcessing, onSuccess, onError, onCancel, onDeclined, onPending }: Props) {
   const [{ isPending, isRejected }] = usePayPalScriptReducer();
   // Keep the latest values without re-rendering the PayPal iframe on every keystroke.
   const latest = useRef({ amountCents, orderId });
@@ -97,13 +113,20 @@ function Buttons({ amountCents, orderId, disabled, onProcessing, onSuccess, onEr
             throw err;
           }
         }}
-        onApprove={async (data) => {
+        onApprove={async (data, actions) => {
           onProcessing?.();
           try {
             const result = await postJson<CaptureResult>(`/api/paypal/orders/${data.orderID}/capture`);
             onSuccess(result);
           } catch (err) {
-            onError(err instanceof Error ? err.message : "We couldn't complete the PayPal payment.");
+            const e = err instanceof CheckoutError ? err : new CheckoutError("We couldn't complete the PayPal payment.", null);
+            if (e.code === "DECLINED") {
+              // Recoverable: reopen the PayPal flow so the buyer can choose another funding source.
+              onDeclined?.(e.message);
+              return actions.restart();
+            }
+            if (e.code === "PENDING") return onPending ? onPending(e.message) : onError(e.message);
+            onError(e.message);
           }
         }}
         onCancel={() => {

@@ -1,6 +1,14 @@
 import "server-only";
 import type { Prisma } from "@prisma/client";
 
+/** Thrown when the recipient doesn't exist or belongs to another demo space. */
+export class UnknownContactError extends Error {
+  constructor() {
+    super("You can only send money to your Finpal contacts.");
+    this.name = "UnknownContactError";
+  }
+}
+
 export class InsufficientFundsError extends Error {
   constructor() {
     super("You don't have enough balance for this payment.");
@@ -25,9 +33,11 @@ export async function transferWithinTx(tx: Prisma.TransactionClient, args: Trans
   if (fromUserId === toUserId) throw new Error("You can't send money to yourself.");
 
   const [from, to] = await Promise.all([
-    tx.user.findUniqueOrThrow({ where: { id: fromUserId }, select: { fullName: true } }),
-    tx.user.findUniqueOrThrow({ where: { id: toUserId }, select: { fullName: true } }),
+    tx.user.findUniqueOrThrow({ where: { id: fromUserId }, select: { fullName: true, spaceId: true } }),
+    tx.user.findUnique({ where: { id: toUserId }, select: { fullName: true, spaceId: true } }),
   ]);
+  // Isolation: money only moves between users of the same space.
+  if (!to || to.spaceId !== from.spaceId) throw new UnknownContactError();
 
   const debit = await tx.user.updateMany({
     where: { id: fromUserId, balanceCents: { gte: amountCents } },

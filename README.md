@@ -122,14 +122,15 @@ Errors the app handles: payment cancelled in the PayPal popup, popup closed, ord
 git clone https://github.com/dechouriog/Finpal.git
 cd Finpal
 npm install
-cp .env.example .env     # fill in the PayPal and OpenRouter keys; PAYPAL_ENV=sandbox, DATABASE_URL="file:./dev.db"
+cp .env.example .env     # fill in the PayPal and OpenRouter keys, AUTH_SECRET (npx auth secret), DEMO_RECORDING_KEY;
+                         # PAYPAL_ENV=sandbox, DATABASE_URL="file:./dev.db"
 ```
 
 **3. Database and demo data**
 
 ```bash
 npx prisma migrate dev
-npm run seed             # creates Laura's account, 12 months of history and sample assets
+npm run seed             # creates the sample assets and the reserved Laura account (safe to re-run)
 ```
 
 **4. Start**
@@ -142,7 +143,7 @@ Use the **Desktop | Mobile** toggle at the top, or open `http://localhost:3000/?
 
 ## Testing the main flow
 
-1. Open the app. Laura's demo account is already loaded.
+1. Open the app and tap **Try the demo**. You get your own private copy of Laura's account: $3,200, 12 months of history and two contacts, Maria and Sam. No sign-up.
 2. Switch to **Mobile** for the intended experience.
 3. Tap **Ask Finpal AI**, choose **Help me start investing** and answer the questions.
 4. Tap **Review & confirm**, keep **Pay with PayPal** selected, tap **Confirm & fund** and log in to the PayPal Sandbox popup with the test account:
@@ -152,7 +153,15 @@ Use the **Desktop | Mobile** toggle at the top, or open `http://localhost:3000/?
 
 Use **Profile → Reset demo data** to run the flow again from the start.
 
-You can also test **Add money** and **Withdraw** from Home, and **Send / Request** between Laura, Maria and Sam (switch users in **Profile**). `npm run test:assistant` runs the whole guided conversation from the terminal.
+You can also test **Add money** and **Withdraw** from Home, and **Send / Request** with your contacts Maria and Sam. `npm run test:assistant` runs the whole guided conversation from the terminal.
+
+### Demo accounts
+
+- **Try the demo** creates an isolated demo space for each visitor (signed in with a secure, httpOnly Auth.js session cookie). Demo users can only see and pay the contacts in their own space, so judges and teammates never share data.
+- Seeded movements are labeled **Demo data** in Activity.
+- New demos are rate-limited to 5 per hour per IP address.
+- A reserved account (`laura@finpal.demo`) is used to record the pitch video. It is only reachable through `/demo/laura?key=<DEMO_RECORDING_KEY>` and is not linked in the UI.
+- `npm run cleanup:demo` deletes demo spaces older than 7 days. **Do not run it before Dec 16, 2026** (judging ends Dec 15); the script refuses to run earlier unless forced.
 
 ## Status and limitations
 

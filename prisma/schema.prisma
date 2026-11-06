@@ -13,7 +13,12 @@ datasource db {
 }
 
 model User {
-  id           String   @id // stable demo ids: "laura", "maria", "sam"
+  // Reserved recording space uses stable ids "laura", "maria", "sam"; demo spaces use random ids.
+  id           String   @id
+  // Isolation: users only see and pay users of their own space. A space's id is its main user's id.
+  spaceId      String
+  // true for accounts created by "Try the demo" (and their seeded contacts); cleaned up after 7 days
+  isDemo       Boolean  @default(false)
   name         String
   fullName     String
   email        String   @unique
@@ -31,6 +36,9 @@ model User {
   autoInvestEvents AutoInvestEvent[]
   requestsMade     MoneyRequest[] @relation("RequestRequester")
   requestsToPay    MoneyRequest[] @relation("RequestPayer")
+
+  @@index([spaceId])
+  @@index([isDemo, createdAt])
 }
 
 /// A user asks another user for money. Paying it creates a SEND/RECEIVE pair.
@@ -62,6 +70,8 @@ model Transaction {
   counterparty String
   // Signed integer cents: positive = money in, negative = money out
   amountCents  Int
+  // Seeded history (shown as "Demo data" in Activity)
+  isSeed       Boolean  @default(false)
   // COMPLETED | PENDING | FAILED
   status       String   @default("COMPLETED")
   note         String?
@@ -126,4 +136,37 @@ model AutoInvestEvent {
   // iCal RRULE (e.g. "FREQ=MONTHLY;BYMONTHDAY=15"), understood by Bryntum Calendar
   recurrenceRule String?
   createdAt      DateTime @default(now())
+}
+
+/// Every PayPal order Finpal creates. The source of truth for crediting a deposit exactly once.
+model PaymentOrder {
+  id            String   @id @default(cuid()) // also used as the PayPal-Request-Id for create
+  userId        String
+  paypalOrderId String?  @unique
+  amountCents   Int
+  // CREATING | CREATED | PENDING | COMPLETED | DECLINED | CANCELED | FAILED | REFUNDED
+  status        String   @default("CREATING")
+  captureId     String?  @unique
+  transactionId String?  @unique // the Finpal ledger row for this deposit
+  debugId       String? // PayPal debug id of the last error, for support
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId, createdAt])
+}
+
+/// Processed PayPal webhook events (dedup: each event id is handled once).
+model WebhookEvent {
+  id         String   @id // PayPal event id
+  type       String
+  receivedAt DateTime @default(now())
+}
+
+/// Finpal AI messages per user per UTC day (daily budget).
+model AiUsage {
+  userId String
+  day    String // YYYY-MM-DD (UTC)
+  count  Int    @default(0)
+
+  @@id([userId, day])
 }

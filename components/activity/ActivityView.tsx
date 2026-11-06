@@ -126,6 +126,33 @@ function FilterChip({ active, onClick, children }: { active: boolean; onClick: (
   );
 }
 
+const PAYPAL_TYPES = new Set(["DEPOSIT", "WITHDRAW", "REFUND"]);
+/** Movements that went through the PayPal Sandbox (orders, payouts, refunds). */
+const isPayPal = (r: ActivityRow) => PAYPAL_TYPES.has(r.type) && !r.isSeed;
+
+const PAYPAL_ID_LABEL: Record<string, string> = {
+  DEPOSIT: "PayPal order ID",
+  WITHDRAW: "PayPal payout ID",
+  REFUND: "PayPal refund ID",
+};
+
+function PayPalTag() {
+  return (
+    <span className="inline-flex h-5 shrink-0 items-center rounded-full bg-navy-soft px-2 text-[10px] font-bold uppercase tracking-wide text-navy">
+      PayPal
+    </span>
+  );
+}
+
+/** Marks seeded history so it's never mistaken for a real movement. */
+function DemoTag() {
+  return (
+    <span className="inline-flex h-5 shrink-0 items-center rounded-full bg-bg px-2 text-[10px] font-semibold uppercase tracking-wide text-muted ring-1 ring-line">
+      Demo data
+    </span>
+  );
+}
+
 function TypeBadge({ type }: { type: TxType }) {
   return (
     <span className={cn("inline-flex h-6 items-center rounded-full px-2.5 text-xs font-semibold", TYPE_BADGE[type])}>
@@ -169,7 +196,21 @@ function ActivityGrid({ rows, onSelect }: { rows: ActivityRow[]; onSelect: (r: A
         filter: "agTextColumnFilter",
         filterValueGetter: (p) => (p.data ? TX_TYPE_LABEL[p.data.type] : ""),
       },
-      { headerName: "Counterparty", field: "title", flex: 1, minWidth: 200, filter: "agTextColumnFilter" },
+      {
+        headerName: "Counterparty",
+        field: "title",
+        flex: 1,
+        minWidth: 200,
+        filter: "agTextColumnFilter",
+        cellRenderer: (p: ICellRendererParams<ActivityRow>) =>
+          p.data ? (
+            <span className="flex items-center gap-2">
+              <span className="truncate">{p.data.title}</span>
+              {p.data.isSeed && <DemoTag />}
+              {isPayPal(p.data) && <PayPalTag />}
+            </span>
+          ) : null,
+      },
       {
         headerName: "Amount",
         field: "amountCents",
@@ -260,7 +301,9 @@ function ActivityList({ rows, onSelect }: { rows: ActivityRow[]; onSelect: (r: A
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold text-ink">{r.title}</span>
-                      <span className="block text-xs text-muted">
+                      <span className="flex items-center gap-1.5 text-xs text-muted">
+                        {r.isSeed && <DemoTag />}
+                        {isPayPal(r) && <PayPalTag />}
                         {TX_TYPE_LABEL[r.type]}
                         {r.status !== "COMPLETED" && ` · ${statusLabel(r.status)}`}
                       </span>
@@ -288,9 +331,18 @@ function TxDetail({ tx }: { tx: ActivityRow }) {
     ["Date", fullFmt.format(new Date(tx.createdAt)) + " UTC"],
     ["Counterparty", tx.counterparty],
   ];
+  if (tx.isSeed) rows.push(["Source", <DemoTag key="d" />]);
   if (tx.note) rows.push(["Note", tx.note]);
   if (tx.shares) rows.push(["Shares", tx.shares.toFixed(4)]);
-  if (tx.externalRef) rows.push(["PayPal reference", <span key="r" className="font-mono text-xs">{tx.externalRef}</span>]);
+  if (isPayPal(tx)) rows.push(["Processed by", <PayPalTag key="p" />]);
+  if (tx.externalRef) {
+    rows.push([
+      PAYPAL_ID_LABEL[tx.type] ?? "PayPal reference",
+      <span key="r" className="font-mono text-xs">
+        {tx.externalRef}
+      </span>,
+    ]);
+  }
   rows.push(["Finpal ID", <span key="i" className="font-mono text-xs">{tx.id}</span>]);
 
   return (

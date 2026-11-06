@@ -23,13 +23,15 @@ const EASE_OUT = [0.22, 1, 0.36, 1] as const;
  */
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  // The welcome screen is public: no navigation and no assistant until a demo starts.
+  const isPublic = pathname === "/welcome";
 
   return (
     <div className="@container/app relative h-full overflow-hidden">
       {/* Overlays (sheets, panels, assistant) render here via <AppPortal>. */}
       <div id={APP_OVERLAY_ID} className="pointer-events-none absolute inset-0 z-40 *:pointer-events-auto" />
       <div className="flex h-full">
-        <Sidebar pathname={pathname} />
+        {!isPublic && <Sidebar pathname={pathname} />}
 
         <div className="flex min-w-0 flex-1 flex-col">
           <main id="main" className="min-h-0 flex-1 overflow-y-auto scrollbar-none">
@@ -48,10 +50,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             {DISCLAIMER}
           </footer>
 
-          <TabBar pathname={pathname} />
+          {!isPublic && <TabBar pathname={pathname} />}
         </div>
       </div>
-      <Assistant />
+      {!isPublic && <Assistant />}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import "server-only";
 import {
+  ApiError,
   CheckoutPaymentIntent,
   Client,
   Environment,
@@ -51,9 +52,54 @@ export function valueToCents(value: string | undefined) {
   return Number(whole) * 100 + Number(frac.padEnd(2, "0"));
 }
 
-/** Create a CAPTURE order for a Finpal top-up. Returns the PayPal order id. */
-export async function createDepositOrder(amountCents: number, referenceId: string) {
+// ---------- errors ----------
+
+/** A PayPal API failure with the fields support needs (never includes personal data). */
+export class PayPalError extends Error {
+  constructor(
+    message: string,
+    readonly code: string | null,
+    readonly debugId: string | null,
+    readonly status: number | null,
+  ) {
+    super(message);
+    this.name = "PayPalError";
+  }
+}
+
+type PayPalErrorBody = { name?: string; message?: string; debug_id?: string; details?: { issue?: string }[] };
+
+function parseErrorBody(raw: unknown): PayPalErrorBody {
+  if (raw && typeof raw === "object") return raw as PayPalErrorBody;
+  if (typeof raw === "string") {
+    try {
+      return JSON.parse(raw) as PayPalErrorBody;
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+
+/** Normalize SDK/REST errors into PayPalError (issue code + debug id). */
+export function toPayPalError(err: unknown, fallback: string): PayPalError {
+  if (err instanceof PayPalError) return err;
+  if (err instanceof ApiError) {
+    const body = parseErrorBody(err.result ?? err.body);
+    const debugId = body.debug_id ?? err.headers?.["paypal-debug-id"] ?? null;
+    const code = body.details?.[0]?.issue ?? body.name ?? null;
+    return new PayPalError(fallback, code, debugId, err.statusCode);
+  }
+  return new PayPalError(fallback, null, null, null);
+}
+
+/**
+ * Create a CAPTURE order for a Finpal top-up. Returns the PayPal order id.
+ * `requestId` is sent as PayPal-Request-Id, so retrying the same request never creates a second order.
+ */
+export async function createDepositOrder(amountCents: number, referenceId: string, requestId: string = referenceId) {
   const { result } = await orders().createOrder({
+    paypalRequestId: requestId,
     body: {
       intent: CheckoutPaymentIntent.Capture,
       purchaseUnits: [
@@ -65,14 +111,33 @@ export async function createDepositOrder(amountCents: number, referenceId: strin
       ],
     },
     prefer: "return=minimal",
+  }).catch((err: unknown) => {
+    throw toPayPalError(err, "PayPal couldn't create the order.");
   });
-  if (!result.id) throw new Error("PayPal did not return an order id.");
+  if (!result.id) throw new PayPalError("PayPal did not return an order id.", null, null, null);
   return result.id;
 }
 
-/** Capture an approved order. Returns the status and the captured amount in cents. */
+/**
+ * Capture an approved order. Idempotent: PayPal-Request-Id is derived from the order id,
+ * so a retried capture returns the original result instead of charging twice.
+ */
 export async function captureOrder(orderId: string) {
-  const { result } = await orders().captureOrder({ id: orderId, prefer: "return=representation" });
+  const { result } = await orders()
+    .captureOrder({ id: orderId, paypalRequestId: `capture-${orderId}`, prefer: "return=representation" })
+    .catch((err: unknown) => {
+      throw toPayPalError(err, "PayPal couldn't complete the payment.");
+    });
+  return summarizeCapture(result);
+}
+
+/** Read an order (used to reconcile when a capture was already done). */
+export async function getOrder(orderId: string) {
+  const { result } = await orders()
+    .getOrder({ id: orderId })
+    .catch((err: unknown) => {
+      throw toPayPalError(err, "PayPal couldn't read the order.");
+    });
   return summarizeCapture(result);
 }
 
@@ -81,6 +146,8 @@ function summarizeCapture(order: Order) {
   return {
     status: order.status ?? "UNKNOWN",
     captureId: capture?.id ?? null,
+    // COMPLETED | PENDING | DECLINED | ... (status of the capture itself)
+    captureStatus: capture?.status ?? null,
     capturedCents: valueToCents(capture?.amount?.value),
     currency: capture?.amount?.currencyCode ?? null,
   };
@@ -113,7 +180,12 @@ export async function createPayout(args: { amountCents: number; receiverEmail: s
   const token = await accessToken();
   const res = await fetch(`${API_BASE}/v1/payments/payouts`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      // Idempotency: retrying the same withdrawal never sends a second payout.
+      "PayPal-Request-Id": `payout-${args.senderBatchId}`,
+    },
     body: JSON.stringify({
       sender_batch_header: {
         sender_batch_id: args.senderBatchId,
@@ -134,11 +206,15 @@ export async function createPayout(args: { amountCents: number; receiverEmail: s
   });
   const json = (await res.json().catch(() => ({}))) as {
     batch_header?: { payout_batch_id?: string; batch_status?: string };
-    message?: string;
-    name?: string;
-  };
+  } & PayPalErrorBody;
   if (!res.ok || !json.batch_header?.payout_batch_id) {
-    throw new Error(json.message || json.name || `PayPal payout failed (${res.status}).`);
+    const body = json as PayPalErrorBody;
+    throw new PayPalError(
+      "PayPal couldn't send this payout.",
+      body.details?.[0]?.issue ?? body.name ?? null,
+      body.debug_id ?? res.headers.get("paypal-debug-id"),
+      res.status,
+    );
   }
   return { batchId: json.batch_header.payout_batch_id, status: json.batch_header.batch_status ?? "PENDING" };
 }
@@ -180,4 +256,42 @@ export async function createDepositOrderViaAgentToolkit(amountCents: number) {
   const id = text.match(/"id"\s*:\s*"([A-Z0-9]{17,32})"/)?.[1];
   if (!id) throw new Error("The PayPal Agent Toolkit did not return an order id.");
   return id;
+}
+
+// ---------- Webhooks ----------
+
+export type WebhookHeaders = {
+  authAlgo: string | null;
+  certUrl: string | null;
+  transmissionId: string | null;
+  transmissionSig: string | null;
+  transmissionTime: string | null;
+};
+
+/**
+ * Verify a webhook with PayPal's verify-webhook-signature API.
+ * Returns "unconfigured" when PAYPAL_WEBHOOK_ID is not set.
+ */
+export async function verifyWebhookSignature(headers: WebhookHeaders, event: unknown) {
+  const webhookId = process.env.PAYPAL_WEBHOOK_ID;
+  if (!webhookId) return "unconfigured" as const;
+  if (Object.values(headers).some((v) => !v)) return "invalid" as const;
+  const token = await accessToken();
+  const res = await fetch(`${API_BASE}/v1/notifications/verify-webhook-signature`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      auth_algo: headers.authAlgo,
+      cert_url: headers.certUrl,
+      transmission_id: headers.transmissionId,
+      transmission_sig: headers.transmissionSig,
+      transmission_time: headers.transmissionTime,
+      webhook_id: webhookId,
+      webhook_event: event,
+    }),
+    cache: "no-store",
+  });
+  if (!res.ok) return "invalid" as const;
+  const json = (await res.json()) as { verification_status?: string };
+  return json.verification_status === "SUCCESS" ? ("valid" as const) : ("invalid" as const);
 }
