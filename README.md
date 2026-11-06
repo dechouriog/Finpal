@@ -215,7 +215,7 @@ Try asking Pal something risky, like *"Can I put all my money into one stock?"*,
 
 ## Deploy on Render
 
-`render.yaml` defines the web service (Starter plan, health check on `/api/health`). The build runs `prisma migrate deploy` with the PostgreSQL schema and then an idempotent seed that only creates the asset catalog and the reserved Laura account.
+`render.yaml` defines the web service (free plan, health check on `/api/health`). The build runs `prisma migrate deploy` with the PostgreSQL schema and then an idempotent seed that only creates the asset catalog and the reserved Laura account.
 
 **1. Database.** Render's free PostgreSQL expires after 30 days and judging runs until Dec 15, 2026, so use one of:
 
@@ -238,7 +238,7 @@ Try asking Pal something risky, like *"Can I put all my money into one stock?"*,
 
 **3. PayPal dashboard.** In your Sandbox app, add a webhook with URL `https://YOUR-APP.onrender.com/api/paypal/webhook` and the events `PAYMENT.CAPTURE.COMPLETED`, `PAYMENT.CAPTURE.DENIED` and `PAYMENT.CAPTURE.REFUNDED`. Copy its Webhook ID into `PAYPAL_WEBHOOK_ID`. No return URL is needed: checkout happens in the PayPal popup.
 
-**Cold starts.** The Starter plan keeps the service running. On the free plan, the service sleeps when idle; a free uptime monitor (for example UptimeRobot) that pings `/api/health` every 10 minutes keeps it awake.
+**Cold starts.** On the free plan the service sleeps after 15 minutes without traffic. A free uptime monitor (for example UptimeRobot) that pings `/api/health` every 10 minutes keeps it awake; setting `plan: starter` in `render.yaml` removes cold starts entirely.
 
 **Schema changes.** Production uses `prisma/postgres/schema.prisma`, generated from `prisma/schema.prisma` by `node scripts/sync-postgres-schema.mjs` (CI checks it is in sync). Create PostgreSQL migrations with `npx prisma migrate dev --schema prisma/postgres/schema.prisma` against a PostgreSQL database.
 
