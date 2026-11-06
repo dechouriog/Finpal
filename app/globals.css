@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------
+ * Finpal brand tokens
+ * Use as Tailwind utilities: bg-navy, text-teal, border-line, etc.
+ * ------------------------------------------------------------------ */
+@theme {
+  --color-navy: #0b3d91;
+  --color-deep: #061a3f;
+  --color-teal: #00c2a8;
+  --color-teal-soft: #e6faf7;
+  --color-navy-soft: #e8eef9;
+  --color-bg: #f6f8fb;
+  --color-surface: #ffffff;
+  --color-ink: #0f172a;
+  --color-muted: #64748b;
+  --color-line: #e2e8f0;
+  --color-success: #16a34a;
+  --color-danger: #dc2626;
+  --color-amber: #f59e0b;
+
+  /* Slightly darker teal for text on white (AA contrast) */
+  --color-teal-ink: #00806f;
+
+  --radius-card: 1.25rem;
+
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Font families come from next/font CSS variables set on <html>. */
+@theme inline {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-manrope), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  html,
+  body {
+    @apply bg-bg text-ink font-sans antialiased;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-teal;
+  }
+
+  ::selection {
+    @apply bg-teal-soft text-deep;
+  }
+}
+
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
