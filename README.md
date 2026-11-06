@@ -4,6 +4,15 @@ An AI investing guide that turns idle wallet savings into a first, well-understo
 
 **Built for the PayPal AI Hackathon 2026**
 
+![Next.js](https://img.shields.io/badge/Next.js-15-000000)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6)
+![PayPal](https://img.shields.io/badge/PayPal-Sandbox-0B3D91)
+![AI](https://img.shields.io/badge/AI-Claude-D97757)
+![AG Grid](https://img.shields.io/badge/AG%20Grid-Community-0E5DA8)
+![Bryntum](https://img.shields.io/badge/Bryntum-Calendar-2A9D8F)
+![Deploy](https://img.shields.io/badge/deploy-Render-46E3B7)
+![License](https://img.shields.io/badge/license-MIT-blue)
+
 Finpal is a web app that you can use in two views:
 
 - **Desktop**: the full app in the browser, with a sidebar and wide tables.
