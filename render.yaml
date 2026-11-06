@@ -1,0 +1,40 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: finpal
+    runtime: node
+    plan: free
+    buildCommand: >-
+      npm ci --include=dev &&
+      node scripts/use-postgres.mjs &&
+      npx prisma generate &&
+      npx prisma db push --skip-generate &&
+      npx tsx scripts/seed-if-empty.ts &&
+      npm run build
+    startCommand: npm run start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: finpal-db
+          property: connectionString
+      - key: PAYPAL_ENV
+        value: sandbox
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: NEXT_PUBLIC_PAYPAL_CLIENT_ID
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_MODEL
+        value: anthropic/claude-haiku-5.5
+
+databases:
+  - name: finpal-db
+    plan: free
+    databaseName: finpal
+    user: finpal

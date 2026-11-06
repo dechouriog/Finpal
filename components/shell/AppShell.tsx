@@ -6,6 +6,9 @@ import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 import { FinpalLogo } from "@/components/brand/FinpalLogo";
 import { SparkleIcon } from "@/components/brand/SparkleIcon";
+import { OPEN_ASSISTANT_EVENT } from "@/components/home/AskAiBanner";
+import { Assistant } from "@/components/assistant/Assistant";
+import { APP_OVERLAY_ID } from "@/components/shell/AppPortal";
 import { DISCLAIMER } from "@/lib/brand";
 import { NAV_ITEMS, isActive } from "@/lib/nav";
 import { cn } from "@/lib/utils";
@@ -22,7 +25,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   return (
-    <div className="@container/app h-full">
+    <div className="@container/app relative h-full overflow-hidden">
+      {/* Overlays (sheets, panels, assistant) render here via <AppPortal>. */}
+      <div id={APP_OVERLAY_ID} className="pointer-events-none absolute inset-0 z-40 *:pointer-events-auto" />
       <div className="flex h-full">
         <Sidebar pathname={pathname} />
 
@@ -46,6 +51,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <TabBar pathname={pathname} />
         </div>
       </div>
+      <Assistant />
     </div>
   );
 }
@@ -87,14 +93,17 @@ function Sidebar({ pathname }: { pathname: string }) {
       </nav>
 
       <div className="mt-auto p-4">
-        {/* Placeholder entry point; the assistant is wired up in step 7. */}
-        <div className="rounded-2xl bg-teal-soft p-4">
-          <div className="flex items-center gap-2 font-display text-sm font-bold text-deep">
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new CustomEvent(OPEN_ASSISTANT_EVENT))}
+          className="w-full rounded-2xl bg-teal-soft p-4 text-left transition-colors hover:bg-[#d8f6f1]"
+        >
+          <span className="flex items-center gap-2 font-display text-sm font-bold text-deep">
             <SparkleIcon className="text-teal" size={18} />
             Ask Finpal AI
-          </div>
-          <p className="mt-1 text-xs text-muted">Ready to make your savings work?</p>
-        </div>
+          </span>
+          <span className="mt-1 block text-xs text-muted">Ready to make your savings work?</span>
+        </button>
       </div>
     </aside>
   );

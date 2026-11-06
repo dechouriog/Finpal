@@ -9,7 +9,6 @@ An AI investing guide that turns idle wallet savings into a first, well-understo
 ![PayPal](https://img.shields.io/badge/PayPal-Sandbox-0B3D91)
 ![AI](https://img.shields.io/badge/AI-Claude-D97757)
 ![AG Grid](https://img.shields.io/badge/AG%20Grid-Community-0E5DA8)
-![Bryntum](https://img.shields.io/badge/Bryntum-Calendar-2A9D8F)
 ![Deploy](https://img.shields.io/badge/deploy-Render-46E3B7)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
@@ -37,7 +36,7 @@ Finpal AI guides the user through one short conversation:
 3. **Protects the safety net.** It sets aside an emergency fund of three months of expenses and only then calculates how much can be invested.
 4. **Builds a starter portfolio** that matches the risk profile and explains each line.
 5. **Explains the risks** in plain language: what could go wrong, how much it could drop in a bad year, and why time matters.
-6. **Waits for confirmation.** The proposal appears as a *Review & confirm* card. When the user confirms, the investment is funded with PayPal and Auto-invest is scheduled for every payday.
+6. **Waits for confirmation.** The proposal appears as a *Review & confirm* card. When the user confirms, the investment is funded with PayPal (or with the Finpal balance, if the user prefers) and Auto-invest is scheduled for every payday.
 
 Example with the demo user: Laura has **$3,200**. Her expenses are about $920 a month, so Finpal keeps **$2,760** as an emergency fund and proposes investing **$440**: 60% broad index funds, 25% bonds and 15% growth stocks, plus $50 every payday.
 
@@ -49,7 +48,7 @@ Example with the demo user: Laura has **$3,200**. Her expenses are about $920 a 
 - **Money as integers.** All amounts are stored in cents (`Int`), never as floats, and every balance change happens inside a database transaction.
 - **Mobile view through container queries.** Layouts react to the width of the app container, not the browser window, so mobile mode works on a desktop monitor. The phone frame is a real container, not an iframe, so the PayPal popup works inside it.
 - **Original brand.** Finpal has its own name, logo, colors and typography. The only PayPal elements are the official ones provided by its SDKs.
-- **Reliable demo.** The guided flow has fallback responses, so it keeps working if the AI API is slow.
+- **Numbers come from tools, not from the model.** Every figure in the chat (income, expenses, emergency fund, amounts) is calculated by a tool over real data and shown in a card. If the AI API is slow or fails, the chat times out with a clear message and the user can retry.
 
 ## Features
 
@@ -58,9 +57,11 @@ Example with the demo user: Laura has **$3,200**. Her expenses are about $920 a 
 | Guided onboarding conversation with streaming responses | Portfolio summary: total value, cash and invested amounts |
 | Reads balance and 12-month cash flow through tools | Positions and assets in AG Grid, with sorting and filters |
 | Calculates the emergency fund and the investable amount | Allocation donut by category |
-| Builds a portfolio for the risk profile | Auto-invest schedule in Bryntum Calendar |
+| Builds a portfolio for the risk profile | Auto-invest calendar with editable recurring plans |
 | Plain-language risk cards | Full transaction history in AG Grid |
 | Review & confirm card before any money moves | Add money with the PayPal Checkout button |
+| Visible tool steps with green checks | Withdraw to a PayPal account with Payouts |
+| Quick replies and shortcut chips | Send and request money between users |
 
 Errors the app handles: payment cancelled in the PayPal popup, popup closed, order not captured, insufficient balance, invalid amount, and AI timeout.
 
@@ -68,13 +69,12 @@ Errors the app handles: payment cancelled in the PayPal popup, popup closed, ord
 
 | Tool | How Finpal uses it |
 |---|---|
-| PayPal | Orders API to fund investments in the Sandbox, and Agent Toolkit tools for the AI agent |
+| PayPal | Orders API (create and capture) to fund the wallet and investments, Payouts API for withdrawals, and the Agent Toolkit to create the deposit orders the AI agent prepares |
 | AG Grid | Portfolio, asset and activity tables |
-| Bryntum | Calendar for Auto-invest contributions |
+| Bryntum | Planned: Bryntum Calendar for the Auto-invest view. Plans are already stored as iCal recurrence rules (`FREQ=MONTHLY;BYMONTHDAY=15,30`), the format Bryntum uses |
 | Render | Hosting for the app and its PostgreSQL database |
-| APIMatic | Context Plugin for the PayPal Server SDKs, used while coding with Claude Code |
 
-**AI:** Claude (Anthropic) powers Finpal AI at runtime with tool calling and streaming. Claude Code was used as a development assistant.
+**AI:** Claude (Anthropic) powers Finpal AI at runtime with tool calling and streaming.
 
 ## Stack
 
@@ -83,8 +83,8 @@ Errors the app handles: payment cancelled in the PayPal popup, popup closed, ord
 | App | Next.js 15 (App Router), React, TypeScript, Tailwind CSS, shadcn/ui, framer-motion |
 | Data | Prisma, SQLite (local), PostgreSQL (production) |
 | Payments | `@paypal/react-paypal-js`, `@paypal/paypal-server-sdk`, `@paypal/agent-toolkit` |
-| AI | Anthropic SDK (Claude) |
-| Tables and calendar | AG Grid Community, Bryntum Calendar |
+| AI | Claude (Anthropic) through OpenRouter, using the OpenAI-compatible SDK with tool calling and streaming |
+| Tables and calendar | AG Grid Community (Bryntum Calendar planned) |
 | Validation | zod |
 | Hosting | Render |
 
@@ -92,20 +92,23 @@ Errors the app handles: payment cancelled in the PayPal popup, popup closed, ord
 
 ```
 .
-├── app/                 Pages (Home, Invest, Activity, Profile) and API routes
-│   └── api/             AI endpoint, PayPal orders, portfolio and Auto-invest
-├── components/          Brand, device frame, AI panel, AG Grid tables, Bryntum calendar
+├── app/                 Pages (Home, Payments, Invest, Activity, Profile) and server actions
+│   └── api/             AI endpoint (streaming) and PayPal order create / capture
+├── components/          Brand, device frame, AI panel, AG Grid tables, Auto-invest calendar
 ├── lib/
-│   ├── agent/           System prompt, tools and fallback responses
-│   ├── paypal/          PayPal Server SDK client
+│   ├── assistant/       System prompt, agent loop, tools and chat cards
+│   ├── paypal.ts        PayPal Server SDK, Payouts and Agent Toolkit client
+│   ├── wallet.ts        Deposits and withdrawals (atomic, idempotent)
+│   ├── cashflow.ts      12-month income, expenses and emergency fund
 │   └── money.ts         Helpers for amounts in cents
-├── prisma/              Schema and seed with the demo data
+├── prisma/              Schema, migrations and seed with the demo data
+├── scripts/             Render build helpers and an assistant smoke test
 └── render.yaml          Render deployment
 ```
 
 ## How to run it
 
-**Requirements:** Node.js 20 or newer, a [PayPal Developer](https://developer.paypal.com/) account with a Sandbox app, an Anthropic API key and a Bryntum trial license.
+**Requirements:** Node.js 20 or newer, a [PayPal Developer](https://developer.paypal.com/) account with a Sandbox app, and an [OpenRouter](https://openrouter.ai/keys) API key (Finpal AI uses Claude through OpenRouter).
 
 **1. PayPal Sandbox credentials**
 
@@ -116,10 +119,10 @@ Errors the app handles: payment cancelled in the PayPal popup, popup closed, ord
 **2. Install and configure**
 
 ```bash
-git clone https://github.com/YOUR_USER/finpal.git
-cd finpal
+git clone https://github.com/dechouriog/Finpal.git
+cd Finpal
 npm install
-cp .env.example .env     # fill in PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, NEXT_PUBLIC_PAYPAL_CLIENT_ID, ANTHROPIC_API_KEY
+cp .env.example .env     # fill in PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, NEXT_PUBLIC_PAYPAL_CLIENT_ID, OPENROUTER_API_KEY
 ```
 
 **3. Database and demo data**
@@ -142,12 +145,14 @@ Use the **Desktop | Mobile** toggle at the top, or open `http://localhost:3000/?
 1. Open the app. Laura's demo account is already loaded.
 2. Switch to **Mobile** for the intended experience.
 3. Tap **Ask Finpal AI**, choose **Help me start investing** and answer the questions.
-4. On *Review & confirm*, tap **Confirm & fund** and log in to the PayPal Sandbox popup with the test account:
+4. Tap **Review & confirm**, keep **Pay with PayPal** selected, tap **Confirm & fund** and log in to the PayPal Sandbox popup with the test account:
    - Email: `sb-xxxxx@personal.example.com`
    - Password: `********`
 5. Check the result in **Invest** and **Activity**.
 
 Use **Profile → Reset demo data** to run the flow again from the start.
+
+You can also test **Add money** and **Withdraw** from Home, and **Send / Request** between Laura, Maria and Sam (switch users in **Profile**). `npm run test:assistant` runs the whole guided conversation from the terminal.
 
 ## Status and limitations
 
@@ -156,7 +161,14 @@ This is a prototype built for the hackathon:
 - Payments use the PayPal Sandbox, not real money.
 - Asset prices are fixed and illustrative. There is no real brokerage or real securities.
 - The 12-month history of the demo user is seeded in the database, because the Sandbox does not easily expose the history of a personal account.
+- Auto-invest runs are scheduled and shown in the calendar, but no background job executes them yet.
 - Finpal AI gives educational information. It is not financial advice.
+
+## Roadmap
+
+- Bryntum Calendar view for Auto-invest (the data model is ready).
+- Live price feed for assets (the integration point is marked in the code).
+- Scheduled job that executes Auto-invest runs on each payday.
 
 ## License
 

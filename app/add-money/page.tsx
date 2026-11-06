@@ -1,13 +1,15 @@
-import { Plus } from "lucide-react";
-import { PagePlaceholder } from "@/components/shell/PagePlaceholder";
+import { AddMoneyFlow } from "@/components/wallet/AddMoneyFlow";
+import { getCurrentUser } from "@/lib/session";
 
-export default function AddMoneyPage() {
+export default async function AddMoneyPage() {
+  const user = await getCurrentUser();
   return (
-    <PagePlaceholder
-      title="Add money"
-      icon={Plus}
-      step={4}
-      description="Top up your Finpal balance with PayPal Checkout (sandbox)."
-    />
+    <div className="mx-auto max-w-xl space-y-6">
+      <div>
+        <h1 className="font-display text-2xl font-extrabold tracking-tight text-ink @3xl/app:text-3xl">Add money</h1>
+        <p className="mt-1 text-sm text-muted">Top up your Finpal balance. Funded with PayPal.</p>
+      </div>
+      <AddMoneyFlow key={user.id} balanceCents={user.balanceCents} />
+    </div>
   );
 }

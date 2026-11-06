@@ -39,8 +39,12 @@ export function DeviceViewer({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const stored = readMode();
-    if (stored) setMode(stored);
+    // ?device=mobile|desktop in the URL wins over the saved preference.
+    const param = new URLSearchParams(window.location.search).get("device");
+    const fromUrl = param === "mobile" || param === "desktop" ? param : null;
+    if (fromUrl) writeMode(fromUrl);
+    const initial = fromUrl ?? readMode();
+    if (initial) setMode(initial);
     setReady(true);
   }, []);
 

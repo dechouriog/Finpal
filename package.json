@@ -11,16 +11,23 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "seed": "tsx prisma/seed.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "test:assistant": "tsx --conditions=react-server --env-file=.env scripts/test-assistant.ts"
   },
   "dependencies": {
+    "@paypal/agent-toolkit": "^1.11.0",
+    "@paypal/paypal-server-sdk": "^2.5.0",
+    "@paypal/react-paypal-js": "^10.6.1",
     "@prisma/client": "^6.19.3",
     "@radix-ui/react-slot": "^1.5.0",
+    "ag-grid-community": "^36.3.0",
+    "ag-grid-react": "^36.3.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "framer-motion": "^14.9.1",
     "lucide-react": "^1.69.0",
     "next": "^15.5.29",
+    "openai": "^7.52.0",
     "prisma": "^6.19.3",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
@@ -42,5 +49,8 @@
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }
