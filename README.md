@@ -122,7 +122,7 @@ Errors the app handles: payment cancelled in the PayPal popup, popup closed, ord
 git clone https://github.com/dechouriog/Finpal.git
 cd Finpal
 npm install
-cp .env.example .env     # fill in PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, NEXT_PUBLIC_PAYPAL_CLIENT_ID, OPENROUTER_API_KEY
+cp .env.example .env     # fill in the PayPal and OpenRouter keys; PAYPAL_ENV=sandbox, DATABASE_URL="file:./dev.db"
 ```
 
 **3. Database and demo data**
